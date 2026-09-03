@@ -23,6 +23,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from spiyweb.scene import ring_radii
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
@@ -107,6 +109,16 @@ def scene_payload_of(
         "dropped_edges": scene.dropped_edges,
         "caption": scene.caption,
         "max_hop": max((node.hop for node in scene.nodes), default=0),
+        # The ring radii travel with the scene so the browser draws its guide
+        # circles from the SAME rule that placed the atoms. The canvas used to
+        # carry a copy of the spacing formula, and the moment the rule changed
+        # the guides described a layout that no longer existed.
+        "rings": [
+            {"hop": hop, "radius": radius}
+            for hop, radius in sorted(
+                ring_radii(node.hop for node in scene.nodes).items()
+            )
+        ],
     }
 
 

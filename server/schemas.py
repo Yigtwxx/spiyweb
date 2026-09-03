@@ -174,9 +174,15 @@ class SceneEdgeDto(BaseModel):
     tooltip: str
 
 
+class RingDto(BaseModel):
+    hop: int
+    radius: float
+
+
 class SceneDto(BaseModel):
     nodes: list[SceneNodeDto]
     edges: list[SceneEdgeDto]
+    rings: list[RingDto] = []
     legend: dict[str, str]
     layer_order: list[str]
     dropped_nodes: int

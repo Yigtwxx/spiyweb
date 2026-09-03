@@ -128,9 +128,17 @@ export type SceneEdgeDto = {
   tooltip: string;
 };
 
+/** One guide circle of the hop layout, radius in normalised units. */
+export type RingDto = {
+  hop: number;
+  radius: number;
+};
+
 export type SceneDto = {
   nodes: SceneNodeDto[];
   edges: SceneEdgeDto[];
+  /** Sent by the server so the guides and the atoms share one rule. */
+  rings?: RingDto[];
   legend: Record<string, string>;
   layer_order: string[];
   dropped_nodes: number;

@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Mapping, Sequence
+    from collections.abc import Collection, Iterable, Mapping, Sequence
 
     from numpy.typing import NDArray
 
@@ -1226,7 +1226,19 @@ def hop_ring_layout(
     rings: dict[int, list[str]] = {}
     for node_id in ids:
         rings.setdefault(int(hops.get(node_id, 0)), []).append(node_id)
-    deepest = max(rings) or 1
+
+    # Rings are spaced by their POSITION in the sequence of hop levels, not by
+    # the hop number, and only activated levels set the scale.
+    #
+    # The old rule was `0.06 + 0.44 * (hop / deepest)`, and it had two faults
+    # that only showed on real data. A web that stopped at first contact has
+    # one level, so every atom landed on the innermost ring - a blob six
+    # percent of the plate wide, with the labels inside each other, which is
+    # what a reader saw for any single-hop query. And a suppressed atom
+    # carries hop -1, which made its radius NEGATIVE; it still drew, mirrored
+    # through the centre, but by accident rather than by decision.
+    levels = sorted(hop for hop in rings if hop >= 0)
+    order = {hop: index for index, hop in enumerate(levels)}
 
     rng = np.random.default_rng(layout_seed(ids, salt, seed))
     placed: dict[str, tuple[float, float]] = {}
@@ -1234,10 +1246,11 @@ def hop_ring_layout(
         members = sorted(
             rings[hop], key=lambda node: (-float(energies.get(node, 0.0)), node)
         )
-        if hop == 0 and len(members) == 1:
+        if hop == 0 and len(members) == 1 and len(levels) > 1:
+            # The single seed of a web that DID travel belongs at the centre.
             placed[members[0]] = (0.5, 0.5)
             continue
-        radius = 0.06 + 0.44 * (hop / deepest)
+        radius = _ring_radius(hop, order, len(levels))
         offset = float(rng.random()) * 2.0 * np.pi
         for position, node_id in enumerate(members):
             angle = offset + 2.0 * np.pi * position / len(members)
@@ -1246,3 +1259,51 @@ def hop_ring_layout(
                 0.5 + radius * float(np.sin(angle)),
             )
     return placed
+
+
+RING_INNER = 0.10
+"""Radius of the first ring when the web travelled. Not zero: hop 0 is a set
+of atoms, and stacking them on the centre point would hide all but one."""
+
+RING_OUTER = 0.44
+"""Radius of the frontier ring, leaving the corners for labels."""
+
+RING_SINGLE = 0.32
+"""The one ring of a web that stopped at first contact. It IS the drawing, so
+it takes the room a drawing needs - the old rule put it at 0.10 and the whole
+picture became a knot."""
+
+RING_GHOST_GAP = 0.06
+"""How far outside the frontier a suppressed atom sits.
+
+Relative to the outermost activated ring rather than an absolute radius: a
+fixed 0.50 put ghosts hard against the edge of the unit square, and on a
+single-ring web - where the frontier is at 0.32 - that stranded them halfway
+across the plate from anything they were cut from. A suppressed atom was cut
+OUT of the web, so just beyond the last ring is the honest place for it, and
+the dashed line back to its survivor then reads as the cut it is."""
+
+
+def _ring_radius(hop: int, order: Mapping[int, int], levels: int) -> float:
+    """Where this hop's ring sits, in normalised radius."""
+    if hop < 0:
+        return (RING_SINGLE if levels <= 1 else RING_OUTER) + RING_GHOST_GAP
+    if levels <= 1:
+        return RING_SINGLE
+    step = order.get(hop, 0) / (levels - 1)
+    return RING_INNER + (RING_OUTER - RING_INNER) * step
+
+
+def ring_radii(hops: Iterable[int]) -> dict[int, float]:
+    """The radius of every ring the layout will draw, keyed by hop.
+
+    Exposed so the browser can draw its guide circles from the SAME rule that
+    placed the atoms. The canvas used to carry its own copy of the spacing
+    formula; the moment this one changed, the guides described a layout that
+    no longer existed and the rings sat where nothing was. One mechanism, one
+    implementation - the same discipline the scene builder itself exists for.
+    """
+    present = sorted({int(hop) for hop in hops})
+    levels = sorted(hop for hop in present if hop >= 0)
+    order = {hop: index for index, hop in enumerate(levels)}
+    return {hop: _ring_radius(hop, order, len(levels)) for hop in present}

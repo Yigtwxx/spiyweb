@@ -34,6 +34,16 @@ const W = 1600;
 const H = 1000;
 const RING_INSET = (W - H) / 2;
 
+// Fit constants, in the same units as W and H.
+/** Breathing room around the drawing, so atoms never touch the plate edge. */
+const FIT_PADDING = 70;
+/** Room above an atom for its label, which the circle's radius does not cover. */
+const LABEL_HEADROOM = 26;
+/** Smallest span the fit will zoom to. A single activated atom must not fill
+ *  the plate: a circle's size is its energy, and one alone has nothing to be
+ *  compared against, so blowing it up would state a magnitude that is not there. */
+const FIT_MIN_SPAN = W * 0.42;
+
 export function WebCanvas({
   scene,
   layout,
@@ -62,9 +72,7 @@ export function WebCanvas({
   const project = (x: number, y: number): [number, number] =>
     layout === "force" ? [x * W, y * H] : [RING_INSET + x * H, y * H];
   const at = (node: SceneNodeDto): [number, number] =>
-    layout === "force"
-      ? project(node.x, node.y)
-      : project(node.rx, node.ry);
+    layout === "force" ? project(node.x, node.y) : project(node.rx, node.ry);
   const edgeAt = (edge: SceneEdgeDto): [number, number, number, number] => {
     const [x1, y1] =
       layout === "force"
@@ -189,7 +197,8 @@ export function WebCanvas({
         1,
       )} ${cy.toFixed(1)} ${bx.toFixed(1)} ${by.toFixed(1)}`;
       if (edge.kind === "suppressed") grouped[edge.layer].cut.push(command);
-      else if (edge.weight >= strongAt) grouped[edge.layer].strong.push(command);
+      else if (edge.weight >= strongAt)
+        grouped[edge.layer].strong.push(command);
       else grouped[edge.layer].active.push(command);
     }
     return grouped;
@@ -216,10 +225,59 @@ export function WebCanvas({
 
   const focused = nodes[focusIndex];
 
+  // The viewBox is fitted to the drawing, not fixed to the sheet.
+  //
+  // Both layouts normalise into [0,1] and then place the atoms wherever the
+  // web's shape puts them — which, for a query that activated eight atoms
+  // across two hops, is a sixty-pixel knot in the middle of a nine-hundred
+  // pixel plate. The picture was three percent of the space it was given and
+  // the labels collapsed into each other, so the page's own subject read as
+  // an empty sheet.
+  //
+  // Fitting means measuring what was actually drawn — atoms expanded by their
+  // radius, plus room above for a label — and pointing the viewBox at that.
+  // `FIT_MIN_SPAN` stops the other extreme: a single activated atom must not
+  // be blown up to fill the plate, because the size of a circle is the size
+  // of its energy and a lone one carries no comparison to be scaled against.
+  const fit = useMemo(() => {
+    if (!nodes.length) return { x: 0, y: 0, w: W, h: H };
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const node of nodes) {
+      const [x, y] = at(node);
+      const r = radius(node);
+      left = Math.min(left, x - r);
+      right = Math.max(right, x + r);
+      // Labels sit above their atom; the drawing is taller than its circles.
+      top = Math.min(top, y - r - LABEL_HEADROOM);
+      bottom = Math.max(bottom, y + r);
+    }
+    const pad = FIT_PADDING;
+    left -= pad;
+    right += pad;
+    top -= pad;
+    bottom += pad;
+
+    // Grow the tighter axis so the sheet's proportion is preserved and the
+    // drawing lands centred rather than stretched.
+    let width = Math.max(right - left, FIT_MIN_SPAN);
+    let height = Math.max(bottom - top, (FIT_MIN_SPAN * H) / W);
+    const ratio = W / H;
+    if (width / height < ratio) width = height * ratio;
+    else height = width / ratio;
+
+    const cx = (left + right) / 2;
+    const cy = (top + bottom) / 2;
+    return { x: cx - width / 2, y: cy - height / 2, w: width, h: height };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, layout, maxEnergy]);
+
   return (
     <div className="relative">
       <svg
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`${fit.x} ${fit.y} ${fit.w} ${fit.h}`}
         className="w-full"
         style={{ aspectRatio: "16 / 10", touchAction: "none" }}
         role="application"
@@ -271,10 +329,14 @@ export function WebCanvas({
             they look like - is one click away. */}
         <g aria-hidden="true">
           {(layout === "hops"
-            ? Array.from({ length: scene.max_hop + 1 }, (_, hop) => hop)
+            ? (scene.rings ?? []).filter((ring) => ring.hop >= 0)
             : []
-          ).map((hop) => {
-            const r = (0.06 + 0.44 * (hop / Math.max(1, scene.max_hop))) * H;
+          ).map(({ hop, radius }) => {
+            // The radius arrives with the scene. This used to be a second
+            // copy of the server's spacing formula, and when that rule
+            // changed the guides drew a layout that no longer existed —
+            // circles in empty space with the atoms somewhere else.
+            const r = radius * H;
             return (
               <g key={hop}>
                 <circle
