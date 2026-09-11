@@ -549,6 +549,11 @@ def _config(monitor: Monitor, _: Invocation) -> None:
                 f"glyphs         {on('ascii' if s.ascii else 'unicode', 'accent')}",
             ),
             ("color", f"colour         {on('on' if s.color else 'off', 'accent')}"),
+            (
+                "mouse",
+                f"mouse          {on('on' if s.mouse else 'off', 'accent')}"
+                + "   (on: wheel scrolls, click picks; copy with shift+drag)",
+            ),
             ("done", monitor.paint("done", "muted")),
         ]
 
@@ -569,6 +574,8 @@ def _config(monitor: Monitor, _: Invocation) -> None:
             s.ascii = not s.ascii
         elif value == "color":
             s.color = not s.color
+        elif value == "mouse":
+            s.mouse = not s.mouse
         else:
             monitor.picker = None
             monitor.save_settings()

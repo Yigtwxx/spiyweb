@@ -56,6 +56,8 @@ from spiyweb.keys import (
     HOME_KEY,
     LEFT,
     NAMED,
+    PAGE_DOWN,
+    PAGE_UP,
     RIGHT,
     TAB,
     UP,
@@ -112,6 +114,9 @@ JOB_LINES_PER_TICK = 20
 
 MOUSE_SCROLL_ROWS = 3
 """Transcript rows one wheel notch moves."""
+
+PAGE_ROWS = 10
+"""Transcript rows page up / page down move."""
 
 
 PROFILES = ("explore", "precise", "compare")
@@ -340,6 +345,9 @@ class Settings:
     hop_delay_ms: int = 650
     ascii: bool = False
     color: bool = True
+    mouse: bool = False
+    """Off: the terminal keeps its own selection and copy. On: the wheel
+    scrolls here and a click picks - and copying needs shift+drag."""
 
     @classmethod
     def load(cls, path: Path, *, base: Settings | None = None) -> Settings:
@@ -476,6 +484,15 @@ class Monitor:
     def save_settings(self) -> None:
         self.settings.save(self.directory / SETTINGS_FILENAME)
         self.apply_settings()
+        self.set_mouse(self.settings.mouse)
+
+    def set_mouse(self, wanted: bool) -> None:
+        """Mouse capture on or off, right now - never both ways at once."""
+        if wanted == getattr(self, "mouse_on", False):
+            return
+        assert self.write is not None
+        self.write(ENABLE_MOUSE if wanted else DISABLE_MOUSE)
+        self.mouse_on = wanted
 
     # --- painting helpers --------------------------------------------------
 
@@ -904,6 +921,10 @@ class Monitor:
             self.cursor = 0
         elif key == END_KEY or key == "\x05":  # ctrl-e
             self.cursor = len(self.buffer)
+        elif key == PAGE_UP:
+            self.scroll += PAGE_ROWS
+        elif key == PAGE_DOWN:
+            self.scroll = max(0, self.scroll - PAGE_ROWS)
         elif key == TAB:
             self._complete()
         elif key == "\x15":  # ctrl-u: the line, gone
@@ -1031,7 +1052,9 @@ class Monitor:
             ("ctrl-u", "clear the line"),
             ("ctrl-l", "clear the transcript"),
             ("any key", "skip a playing query to its last frame"),
-            ("mouse", "wheel scrolls, a click picks a list item or suggestion"),
+            ("pgup / pgdn", "scroll the transcript"),
+            ("mouse", "off by default so selecting and copying text works;"),
+            ("", "/config turns it on: wheel scrolls, click picks, shift+drag copies"),
             ("ctrl-c twice", "leave (or just close the terminal)"),
         ]
         return [self.paint("shortcuts", "bold")] + [
@@ -1130,9 +1153,11 @@ class Monitor:
     def run(self) -> int:
         out = self.write
         assert out is not None and self.poll is not None
-        out(HIDE_CURSOR + CLEAR_SCREEN + ENABLE_FOCUS + ENABLE_MOUSE)
-        self.flush()
+        out(HIDE_CURSOR + CLEAR_SCREEN + ENABLE_FOCUS)
         previous_input = enable_windows_vt_input()
+        self.mouse_on = False
+        self.set_mouse(self.settings.mouse)
+        self.flush()
         self.marker.start()
         if self.debug:
             self.debug(

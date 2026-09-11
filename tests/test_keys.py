@@ -50,7 +50,7 @@ def test_decode_escape_names_every_arrow_and_a_bare_escape(
         ("\xe0", "P", DOWN),
         ("\xe0", "K", LEFT),
         ("\xe0", "M", RIGHT),
-        ("\xe0", "Q", ""),
+        ("\xe0", "Z", ""),
         ("\r", None, ENTER),
         ("\x08", None, BACKSPACE),
         ("\x1b", None, ESCAPE),
@@ -132,3 +132,20 @@ def test_a_mouse_report_is_decoded_and_parsed() -> None:
     assert parse_mouse(key) == (64, 1, 1, False)
     burst = list("[<x;y;zM")
     assert decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0)) == ""
+
+
+def test_page_keys_are_named_on_both_platforms() -> None:
+    from spiyweb.keys import PAGE_DOWN, PAGE_UP
+
+    assert name_windows_key("\xe0", lambda: "I") == PAGE_UP
+    assert name_windows_key("\xe0", lambda: "Q") == PAGE_DOWN
+    burst = list("[5~")
+    assert (
+        decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0))
+        == PAGE_UP
+    )
+    burst = list("[6~")
+    assert (
+        decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0))
+        == PAGE_DOWN
+    )

@@ -44,6 +44,8 @@ __all__ = [
     "LEFT",
     "MOUSE",
     "NAMED",
+    "PAGE_DOWN",
+    "PAGE_UP",
     "RIGHT",
     "TAB",
     "UP",
@@ -57,6 +59,7 @@ UP, DOWN, LEFT, RIGHT = "up", "down", "left", "right"
 ENTER, BACKSPACE, ESCAPE, TAB = "enter", "backspace", "escape", "tab"
 FOCUS_IN, FOCUS_OUT = "focus_in", "focus_out"
 HOME_KEY, END_KEY, DELETE = "home", "end", "delete"
+PAGE_UP, PAGE_DOWN = "page_up", "page_down"
 MOUSE = "mouse"
 """Prefix of a mouse report: `mouse:<button>:<column>:<row>:<press|release>`."""
 ENABLE_MOUSE, DISABLE_MOUSE = "\x1b[?1000h\x1b[?1006h", "\x1b[?1006l\x1b[?1000l"
@@ -77,6 +80,8 @@ NAMED = frozenset(
         HOME_KEY,
         END_KEY,
         DELETE,
+        PAGE_UP,
+        PAGE_DOWN,
     }
 )
 ENABLE_FOCUS, DISABLE_FOCUS = "\x1b[?1004h", "\x1b[?1004l"
@@ -89,6 +94,8 @@ _WINDOWS_ARROWS = {
     "G": HOME_KEY,
     "O": END_KEY,
     "S": DELETE,
+    "I": PAGE_UP,
+    "Q": PAGE_DOWN,
 }
 _POSIX_ARROWS = {
     "A": UP,
@@ -186,8 +193,8 @@ def decode_escape(pending: Callable[[], bool], read: Callable[[int], str]) -> st
     third = read(1)
     if third == "<":
         return _mouse_report(read)
-    if third == "3" and pending() and read(1) == "~":  # ESC [ 3 ~ is Delete
-        return DELETE
+    if third in ("3", "5", "6") and pending() and read(1) == "~":
+        return {"3": DELETE, "5": PAGE_UP, "6": PAGE_DOWN}[third]  # ESC [ n ~
     return _POSIX_ARROWS.get(third, "")
 
 

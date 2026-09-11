@@ -32,6 +32,10 @@ regression suite, and its CLI flags are not covered by the policy above.
 - `/find` prints one row per file (import count, first line) instead of
   one per import, and skips spiyweb's own package tree when run inside a
   checkout of it.
+- Mouse capture is **off by default** so the terminal's own selection
+  and copy keep working; `/config` turns it on (wheel scrolls, click
+  picks, copy with shift+drag). Page Up / Page Down scroll the transcript
+  either way.
 
 ## [0.2.0] - 2026-09-11
 
