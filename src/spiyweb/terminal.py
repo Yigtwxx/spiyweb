@@ -85,6 +85,7 @@ _CODES = {
     "bold": "1",
     "dim": "2",
     "italic": "3",
+    "reverse": "7",  # the caret sitting ON a character
     # --- blue: structure, energy, things that went right ---
     "heading": "38;5;39",  # azure, always bold - section titles
     "accent": "38;5;75",  # periwinkle - prompts, numbers, the command to copy

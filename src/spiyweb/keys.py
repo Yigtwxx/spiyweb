@@ -29,13 +29,16 @@ if TYPE_CHECKING:
 
 __all__ = [
     "BACKSPACE",
+    "DELETE",
     "DISABLE_FOCUS",
     "DOWN",
     "ENABLE_FOCUS",
+    "END_KEY",
     "ENTER",
     "ESCAPE",
     "FOCUS_IN",
     "FOCUS_OUT",
+    "HOME_KEY",
     "LEFT",
     "NAMED",
     "RIGHT",
@@ -48,14 +51,37 @@ __all__ = [
 UP, DOWN, LEFT, RIGHT = "up", "down", "left", "right"
 ENTER, BACKSPACE, ESCAPE, TAB = "enter", "backspace", "escape", "tab"
 FOCUS_IN, FOCUS_OUT = "focus_in", "focus_out"
+HOME_KEY, END_KEY, DELETE = "home", "end", "delete"
 """What a terminal with focus reporting on (`ENABLE_FOCUS`) sends when the
 window gains or loses the keyboard - the caret follows."""
 NAMED = frozenset(
-    {UP, DOWN, LEFT, RIGHT, ENTER, BACKSPACE, ESCAPE, TAB, FOCUS_IN, FOCUS_OUT}
+    {
+        UP,
+        DOWN,
+        LEFT,
+        RIGHT,
+        ENTER,
+        BACKSPACE,
+        ESCAPE,
+        TAB,
+        FOCUS_IN,
+        FOCUS_OUT,
+        HOME_KEY,
+        END_KEY,
+        DELETE,
+    }
 )
 ENABLE_FOCUS, DISABLE_FOCUS = "\x1b[?1004h", "\x1b[?1004l"
 
-_WINDOWS_ARROWS = {"H": UP, "P": DOWN, "K": LEFT, "M": RIGHT}
+_WINDOWS_ARROWS = {
+    "H": UP,
+    "P": DOWN,
+    "K": LEFT,
+    "M": RIGHT,
+    "G": HOME_KEY,
+    "O": END_KEY,
+    "S": DELETE,
+}
 _POSIX_ARROWS = {
     "A": UP,
     "B": DOWN,
@@ -63,6 +89,8 @@ _POSIX_ARROWS = {
     "D": LEFT,
     "I": FOCUS_IN,
     "O": FOCUS_OUT,
+    "H": HOME_KEY,
+    "F": END_KEY,
 }
 _ESCAPE_WAIT_S = 0.05
 _WINDOWS_SLICE_S = 0.01
@@ -147,7 +175,10 @@ def decode_escape(pending: Callable[[], bool], read: Callable[[int], str]) -> st
         return ESCAPE
     if read(1) not in ("[", "O"):
         return ""
-    return _POSIX_ARROWS.get(read(1), "")
+    third = read(1)
+    if third == "3" and pending() and read(1) == "~":  # ESC [ 3 ~ is Delete
+        return DELETE
+    return _POSIX_ARROWS.get(third, "")
 
 
 def _name_char(char: str) -> str:

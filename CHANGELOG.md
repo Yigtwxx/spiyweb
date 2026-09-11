@@ -95,6 +95,9 @@ regression suite, and its CLI flags are not covered by the policy above.
   its output streaming into the transcript - the way to start the project
   from the same window and watch it; `/jobs` lists them, `/kill [n]` stops
   one, and every job ends with the monitor. The child gets no stdin.
+- The input line has a cursor: left/right move inside it, home/end and
+  ctrl-a/ctrl-e jump, delete removes under it, typing inserts there; the
+  caret sits on the character it covers.
 - `TraceConfig.attach_dir` / `attach_stale_s`, `spiyweb.config.WatchConfig`
   (the monitor's knobs; not in `spiyweb.__all__`), `spiyweb.trace.WATCH_MARKER`,
   `attached_trace_path`, `ensure_private_dir`.

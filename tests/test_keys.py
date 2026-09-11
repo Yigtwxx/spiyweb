@@ -50,7 +50,7 @@ def test_decode_escape_names_every_arrow_and_a_bare_escape(
         ("\xe0", "P", DOWN),
         ("\xe0", "K", LEFT),
         ("\xe0", "M", RIGHT),
-        ("\xe0", "S", ""),
+        ("\xe0", "Q", ""),
         ("\r", None, ENTER),
         ("\x08", None, BACKSPACE),
         ("\x1b", None, ESCAPE),
@@ -100,3 +100,21 @@ def test_poll_returns_the_key_as_soon_as_one_is_waiting(
         1.0, kbhit=lambda: next(hits), getwch=lambda: "k", sleep=lambda _: None
     )
     assert result == "k"
+
+
+def test_home_end_and_delete_are_named_on_both_platforms() -> None:
+    from spiyweb.keys import DELETE, END_KEY, HOME_KEY
+
+    assert name_windows_key("\xe0", lambda: "G") == HOME_KEY
+    assert name_windows_key("\xe0", lambda: "O") == END_KEY
+    assert name_windows_key("\xe0", lambda: "S") == DELETE
+    burst = list("[3~")
+    assert (
+        decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0))
+        == DELETE
+    )
+    burst = list("[H")
+    assert (
+        decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0))
+        == HOME_KEY
+    )

@@ -488,3 +488,44 @@ def test_an_empty_bang_is_refused(tmp_path: Path) -> None:
     monitor.start_job("")
     assert "nothing to run" in "\n".join(monitor.transcript)
     assert monitor.jobs == []
+
+
+def test_the_cursor_moves_inside_the_line_and_edits_there(tmp_path: Path) -> None:
+    driver = Driver([None])
+    monitor, _ = make_monitor(tmp_path, driver)
+    for key in "/qery":
+        monitor.handle_key(key, 0.0)
+    for _ in range(3):
+        monitor.handle_key("left", 0.0)
+    monitor.handle_key("u", 0.0)
+    assert monitor.buffer == "/query" and monitor.cursor == 3
+    monitor.handle_key("home", 0.0)
+    assert monitor.cursor == 0
+    monitor.handle_key("delete", 0.0)
+    assert monitor.buffer == "query"
+    monitor.handle_key("end", 0.0)
+    monitor.handle_key("backspace", 0.0)
+    assert monitor.buffer == "quer" and monitor.cursor == 4
+    monitor.handle_key("left", 0.0)
+    monitor.handle_key("left", 0.0)
+    monitor.handle_key("\x01", 0.0)
+    assert monitor.cursor == 0
+    monitor.handle_key("\x05", 0.0)
+    assert monitor.cursor == 4
+    monitor.buffer = "reset"
+    assert monitor.cursor == 5, "setting the line moves the cursor to its end"
+
+
+def test_the_caret_is_drawn_where_the_cursor_is(tmp_path: Path) -> None:
+    driver = Driver([None])
+    monitor, _ = make_monitor(tmp_path, driver)
+    monitor.color = True
+    monitor.settings.color = True
+    monitor.apply_settings()
+    monitor.buffer = "abc"
+    monitor.handle_key("left", 0.0)
+    line = monitor.input_box(60, True)[1]
+    assert "\x1b[7mc\x1b[0m" in line, "the character under the cursor is reversed"
+    monitor.handle_key("end", 0.0)
+    line = monitor.input_box(60, True)[1]
+    assert "abc" in line and "▏" in line

@@ -42,14 +42,19 @@ from spiyweb.animate import Glyphs, Style, block_height, query_block
 from spiyweb.config import WatchConfig
 from spiyweb.keys import (
     BACKSPACE,
+    DELETE,
     DISABLE_FOCUS,
     DOWN,
     ENABLE_FOCUS,
+    END_KEY,
     ENTER,
     ESCAPE,
     FOCUS_IN,
     FOCUS_OUT,
+    HOME_KEY,
+    LEFT,
     NAMED,
+    RIGHT,
     TAB,
     UP,
     poll_raw,
@@ -372,7 +377,8 @@ class Monitor:
         )
         self.tail = TraceTail(self.directory / TRACE_FILENAME)
         self.transcript: list[str] = []
-        self.buffer = ""
+        self._buffer = ""
+        self.cursor = 0
         self.history: list[str] = []
         self.history_at = 0
         self.tab_seed: str | None = None
@@ -393,6 +399,34 @@ class Monitor:
         self.focused = True
         self.debug = _debug_log(self.directory)
         self.tick_count = 0
+
+    # --- the input line ------------------------------------------------------
+
+    @property
+    def buffer(self) -> str:
+        return self._buffer
+
+    @buffer.setter
+    def buffer(self, text: str) -> None:
+        """Setting the whole line puts the cursor at its end - history, tab
+        completion and clearing all mean "start typing from here"."""
+        self._buffer = text
+        self.cursor = len(text)
+
+    def insert(self, text: str) -> None:
+        self._buffer = self._buffer[: self.cursor] + text + self._buffer[self.cursor :]
+        self.cursor += len(text)
+
+    def delete_before(self) -> None:
+        if self.cursor:
+            self._buffer = self._buffer[: self.cursor - 1] + self._buffer[self.cursor :]
+            self.cursor -= 1
+
+    def delete_under(self) -> None:
+        self._buffer = self._buffer[: self.cursor] + self._buffer[self.cursor + 1 :]
+
+    def move(self, step: int) -> None:
+        self.cursor = max(0, min(len(self._buffer), self.cursor + step))
 
     # --- settings ----------------------------------------------------------
 
@@ -542,7 +576,17 @@ class Monitor:
                 placeholder += f"  (enter for {self.prompt.default})"
             body = caret + self.paint(placeholder, "muted")
         elif self.buffer:
-            body = self.buffer + caret
+            before, under, after = (
+                self.buffer[: self.cursor],
+                self.buffer[self.cursor : self.cursor + 1],
+                self.buffer[self.cursor + 1 :],
+            )
+            if not under:
+                body = before + caret
+            elif blink and self.focused:
+                body = before + self.paint(under, "reverse") + after
+            else:
+                body = before + under + after
         else:
             body = caret + self.paint(
                 "type a command - / lists them, ! runs a shell command", "dim"
@@ -791,7 +835,17 @@ class Monitor:
         if key == ENTER:
             self._submit()
         elif key == BACKSPACE:
-            self.buffer = self.buffer[:-1]
+            self.delete_before()
+        elif key == DELETE:
+            self.delete_under()
+        elif key == LEFT:
+            self.move(-1)
+        elif key == RIGHT:
+            self.move(1)
+        elif key == HOME_KEY or key == "\x01":  # ctrl-a
+            self.cursor = 0
+        elif key == END_KEY or key == "\x05":  # ctrl-e
+            self.cursor = len(self.buffer)
         elif key == TAB:
             self._complete()
         elif key == "\x15":  # ctrl-u: the line, gone
@@ -819,7 +873,7 @@ class Monitor:
                     else ""
                 )
         elif key and key not in NAMED and key.isprintable():
-            self.buffer += key
+            self.insert(key)
 
     def _picker_key(self, key: str) -> None:
         picker = self.picker
@@ -890,6 +944,7 @@ class Monitor:
             ("/", "commands - keep typing to narrow, tab completes"),
             ("tab", "complete the command (again: the next match)"),
             ("up / down", "earlier commands"),
+            ("left / right", "move inside the line; home / end, ctrl-a / ctrl-e"),
             ("esc", "clear the line, or close a list"),
             ("ctrl-u", "clear the line"),
             ("ctrl-l", "clear the transcript"),
