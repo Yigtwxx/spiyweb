@@ -21,6 +21,50 @@ not from one cluster of near-duplicates.
 
 ---
 
+## Install and start
+
+Python 3.11+ on Windows, macOS or Linux. One install, one word to start.
+
+**Windows (PowerShell)**
+
+```powershell
+pip install spiyweb          # or: uv tool install spiyweb
+cd C:\path\to\your-project
+spiyweb
+```
+
+**macOS / Linux**
+
+```bash
+pip3 install spiyweb         # or: uv tool install spiyweb   (pipx works too)
+cd ~/path/to/your-project
+spiyweb
+```
+
+`spiyweb` takes the window over: a welcome box with the spider, a
+transcript, a `/` prompt, a status bar. Start your project in a second
+terminal - or from the prompt with `! python app.py` - and every query it
+makes through `spiyweb.open_index(...)` plays on screen as it happens.
+`/help` lists the commands, `?` the shortcuts, `/config` the knobs (profile,
+ring map, spider, speed, glyphs, colour, mouse). Only closing the terminal
+ends it.
+
+Building an index needs the index-time extras once:
+
+```bash
+pip install "spiyweb[index]"
+python -m spacy download en_core_web_sm
+```
+
+or, inside the monitor, `/install index`. `pip install spiyweb` on its own
+pulls in **nothing** - the core is pure Python.
+
+If the console cannot draw braille or box lines (an old `conhost`, a plain
+`TERM=dumb`), `SPIYWEB_ASCII=1 spiyweb` uses the plain glyph set; a pipe or
+a CI job gets the usage text and exit 2 instead of a prompt.
+
+---
+
 ## Why
 
 Classic RAG retrieval has two structural weaknesses:
@@ -53,25 +97,15 @@ entire value proposition.
 
 ## Try it
 
-The terminal is the interface. Install it, open a terminal in your project
-folder, type one word:
-
-```bash
-pip install spiyweb          # or: uv tool install spiyweb
-spiyweb
-```
-
-The window becomes the monitor: a welcome box, a transcript, a `/` prompt.
-Run your project in another terminal - or from the prompt, `! python app.py`
-- and every query it makes through `spiyweb.open_index(...)` is played
-there as it happens: the ranking bars growing in hop by hop on the left,
-the ring map on the right, the ledger line under both. No socket, no
-server, no code in your application: the monitor leaves a marker in
-`.spiyweb/`, the library appends its records there while the marker is
-fresh, the monitor tails them. `/find` locates the file that imports
-spiyweb and the index it opens; `/query`, `/lint`, `/index` and `/install`
-are the old menu's questions as commands; `/config` is an arrow-key list of
-the monitor's own knobs; `/help` lists the rest.
+What the monitor shows: the ranking bars growing in hop by hop on the
+left, the ring map on the right, the ledger line under both, and the top
+passages under that. No socket, no server, no code in your application:
+the monitor leaves a marker in `.spiyweb/`, the library appends its
+records there while the marker is fresh, the monitor tails them. `/find`
+locates the file that imports spiyweb and the index it opens; `/query`,
+`/lint`, `/index` and `/install` are the old menu's questions as commands;
+`/replay` plays a recorded query again; `examples/hello_web.py` is a
+three-question app to watch first.
 
 The same verbs work without the screen, for scripts and pipes:
 
