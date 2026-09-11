@@ -529,3 +529,14 @@ def test_the_caret_is_drawn_where_the_cursor_is(tmp_path: Path) -> None:
     monitor.handle_key("end", 0.0)
     line = monitor.input_box(60, True)[1]
     assert "abc" in line and "▏" in line
+
+
+def test_a_bang_python_is_the_monitors_python() -> None:
+    import sys
+
+    from spiyweb.watch import same_python
+
+    assert same_python("python app.py") == f'"{sys.executable}" app.py'
+    assert same_python("PY -m mod") == f'"{sys.executable}" -m mod'
+    assert same_python("python") == f'"{sys.executable}"'
+    assert same_python("npm start") == "npm start"

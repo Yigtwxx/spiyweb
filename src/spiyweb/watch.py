@@ -238,6 +238,19 @@ class Prompt:
     default: str = ""
 
 
+PYTHON_NAMES = ("python", "python3", "py")
+
+
+def same_python(command: str) -> str:
+    """`! python app.py` means THIS python - the one that has spiyweb - not
+    whichever one the shell finds first. Anything else runs as typed."""
+    parts = command.split(None, 1)
+    if parts and parts[0].lower() in PYTHON_NAMES:
+        rest = parts[1] if len(parts) > 1 else ""
+        return f'"{sys.executable}" {rest}'.rstrip()
+    return command
+
+
 @dataclass
 class Job:
     """A shell command started with `!`, running beside the monitor.
@@ -256,10 +269,15 @@ class Job:
 
     @classmethod
     def start(cls, number: int, command: str, cwd: Path) -> Job:
+        command = same_python(command)
+        environment = dict(os.environ)
+        here = str(Path(sys.executable).parent)
+        environment["PATH"] = here + os.pathsep + environment.get("PATH", "")
         process = subprocess.Popen(
             command,
             shell=True,
             cwd=str(cwd),
+            env=environment,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -1000,7 +1018,8 @@ class Monitor:
         self.jobs.append(job)
         self.reply(
             self.paint(f"job {job.number} started", "good")
-            + self.paint(f"  pid {job.process.pid} - /jobs lists, /kill stops", "dim")
+            + self.paint(f"  pid {job.process.pid} - /jobs lists, /kill stops", "dim"),
+            self.paint(same_python(command), "dim"),
         )
 
     def pump_jobs(self) -> None:
