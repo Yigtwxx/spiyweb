@@ -33,6 +33,7 @@ PUBLIC_API = frozenset(
         "ActivationPath",
         "Answer",
         "COMPARE",
+        "DEFAULT_PROFILE",
         "ColoredAnswer",
         "ColoredResult",
         "ColoredRetrievalConfig",
@@ -259,8 +260,8 @@ def test_the_index_time_facade_is_separate_from_the_query_contract() -> None:
 def test_the_scene_module_stays_outside_the_zero_dependency_promise() -> None:
     """`spiyweb.scene` costs numpy, so it is an extra and never an eager import.
 
-    It was promoted into the package in Faz 2.2 so that the browser face and
-    any other consumer draw one picture rather than reimplementing the layout.
+    It was promoted into the package in Faz 2.2 so that every consumer draws
+    one picture rather than reimplementing the layout.
     That promotion is only free while `import spiyweb` stays untouched by it.
     """
     assert "scene" not in PUBLIC_API

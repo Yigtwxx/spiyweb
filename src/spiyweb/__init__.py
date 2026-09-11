@@ -63,7 +63,14 @@ from spiyweb.output import (
     gap_warnings,
     theme_clusters,
 )
-from spiyweb.profiles import COMPARE, EXPLORE, PRECISE, PROFILES, Profile
+from spiyweb.profiles import (
+    COMPARE,
+    DEFAULT_PROFILE,
+    EXPLORE,
+    PRECISE,
+    PROFILES,
+    Profile,
+)
 from spiyweb.questions import ConflictQuestion, build_conflict_question
 from spiyweb.retrieve import (
     ColoredRetrievalResult,
@@ -87,6 +94,7 @@ __version__ = "0.1.2"
 
 __all__ = [
     "COMPARE",
+    "DEFAULT_PROFILE",
     "EXPLORE",
     "PRECISE",
     "PROFILES",

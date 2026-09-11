@@ -30,9 +30,7 @@ venv/
 *.egg-info/
 .ruff_cache/
 .pytest_cache/
-# `uv build` output and the throwaway env the wheel smoke job installs
-# into. Root-anchored on purpose: `web/dist/` has its own rule below and
-# stops being throwaway the day the viewer ships inside the wheel.
+# `uv build` output and the throwaway env the wheel smoke job installs into.
 /dist/
 /build/
 .wheelenv/
@@ -44,13 +42,5 @@ data/
 runs/
 
 
-
-# Browser UI (npm world; never part of the Python package)
-web/node_modules/
-web/dist/
-# The built browser bundle, as of Faz 2.5. Compiled output, kept out of a
-# public history; `pyproject.toml` names it under `artifacts` so the wheel
-# still gets it.
-src/spiyweb/viewer/static/
 .modelenv/
 .modelrun/

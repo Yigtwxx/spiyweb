@@ -204,6 +204,12 @@ def retrieve(
     Seed ids absent from the graph's adjacency are allowed: an isolated chunk
     legitimately receives and holds its share of the energy.
 
+    This is the config-in primitive: `config=None` means the bare
+    `RetrievalConfig()`, which carries the canonical trace and cannot spread
+    past five seeds - it warns when that happens rather than picking a
+    profile for you. The default profile lives one level up, in
+    `SpiywebIndex.retrieve()` and `ThermalSession`.
+
     `residue` is the thermal conversation memory (D22/D32): leftover energy
     from the previous turn, injected on top of the seed split so a follow-up
     lands on warm ground - `ThermalSession` builds and manages it across

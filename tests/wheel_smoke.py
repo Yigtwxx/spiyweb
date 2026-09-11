@@ -102,16 +102,4 @@ with tempfile.TemporaryDirectory() as folder:
     assert load_traces(written) == (record,), "the trace reader did not round-trip"
     assert load_traces(Path(folder)) == (record,), "a directory should resolve"
 
-# 8. The browser bundle shipped, so `inspect_url()` has a page to serve. Not
-#    fatal on its own - a wheel built without the front end is still a working
-#    library - but it is the difference between the two, and silence about
-#    which one you have is the failure mode worth naming.
-from spiyweb.viewer import bundle_path  # noqa: E402
-
-bundle = bundle_path()
-page = "with the browser bundle" if bundle is not None else "WITHOUT a bundle"
-
-print(
-    f"wheel smoke ok: spiyweb {spiyweb.__version__}, "
-    f"{len(spiyweb.__all__)} names, {page}"
-)
+print(f"wheel smoke ok: spiyweb {spiyweb.__version__}, {len(spiyweb.__all__)} names")

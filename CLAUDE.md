@@ -80,7 +80,7 @@ knobs. Full rationale for each lives in `memory/`.
 | Rule | Value / behaviour |
 |---|---|
 | Multi-seed colours | The query is decomposed; each part is a differently **coloured** seed. A node where two colours meet is a **bridge** — that is where a multi-hop answer lives. Runs as an ablation in Phase 1 |
-| Query profiles | `precise` / `explore` / `compare` — each carries its own damping, threshold and seed width. The caller picks; never an LLM inside `core/` |
+| Query profiles | `precise` / `explore` / `compare` — each carries its own damping, threshold and seed width. The caller picks; never an LLM inside `core/`. **Library default is `explore`** (`DEFAULT_PROFILE`) in `SpiywebIndex.retrieve()` and `ThermalSession` when the caller gives neither a profile nor a config — the bare `RetrievalConfig()` (5 seeds × 15% threshold) cannot forward past hop 0 and is kept only as the canonical-trace object of §2.6. A config the caller supplies is never overlaid; `retrieve()` warns if it cannot spread. Same default in the terminal since 0.1.2 |
 | Conversation memory | **20–30%** of the previous turn's energy persists; follow-up questions land on warm ground. Reset is **hybrid**: caller-controlled `reset()` by default, optional topic-change auto-detection behind a config flag |
 
 ### 2.5 Output contract
@@ -173,7 +173,7 @@ src/spiyweb/
 ├── profiles.py           # precise / explore / compare propagation profiles
 ├── thermal.py            # ThermalSession: conversation warmth across turns
 ├── config.py             # dataclass: damping, threshold, max_hop, max_nodes, weights
-├── cli.py                # `spiyweb` command: version / index / query / view / lint
+├── cli.py                # `spiyweb` command: version / index / query / lint
 ├── terminal.py           # ANSI colour and bars, zero dependencies
 ├── wizard.py             # bare `spiyweb`: guided menu, never in a pipe
 ├── store.py              # numpy + FAISS single-file vector store (outside core/)
@@ -185,13 +185,6 @@ src/spiyweb/
 ├── trace.py              # recorded calls (D38): self-contained, JSONL-able
 ├── ledger.py             # energy ledger: held / dissipated / destroyed
 ├── scene.py              # render-agnostic layout/scene, numpy only (D2.2)
-├── viewer/               # the browser face that SHIPS - spiyweb[web]
-│   ├── app.py            # trace list, one record, its scene, a live query
-│   ├── serving.py        # inspect_url(): loopback, port 0, token, a thread
-│   ├── security.py       # the three rules; none of them are defaults
-│   ├── sources.py        # a live ring buffer, or a JSONL file on disk
-│   ├── scenes.py         # a recorded call, through the shared scene builder
-│   └── static/           # the built bundle, package data (gitignored source)
 ├── retrieve.py           # seed injection -> propagate -> structured result
 └── evaluation/           # renamed from eval/ — avoids shadowing the Python builtin
     ├── datasets.py       # MuSiQue loader: download, deterministic sample, dedup pool
@@ -202,18 +195,15 @@ src/spiyweb/
     ├── stats.py          # paired bootstrap CI - the protocol's interval, one copy
     ├── index.py          # corpus -> vectors + entities + edge-layer artifacts
     └── run.py            # CLI: download / index / evaluate / report
-
-server/                   # the MEASUREMENT RIG - repository, never the wheel
-├── app.py                # FastAPI routes + SSE + serves the built bundle
-├── inspect_api.py        # one query end to end: retrieve -> scene -> ledger
-├── runner.py             # measurement-run supervisor: plan token, lock, logs
-└── resources.py          # process-wide LRU cache: graph, store, vectors
-
-web/                      # ONE front end, two products - React + Vite + TS
-├── src/views/            # Traces (recorded), Inspect (live), Runs (the rig)
-└── src/components/       # WebCanvas, LedgerStrip, Meter, Plate
-                          #   builds into src/spiyweb/viewer/static
 ```
+
+There is no browser face in the tree any more. The React front end, the
+FastAPI viewer package (`spiyweb.viewer`, `inspect_url()`, `spiyweb view`,
+the `[web]` extra) and the `server/` measurement rig were **removed on
+2026-09-11** — the owner has a different interface in mind. What stayed is
+everything that interface will need and that never depended on a browser:
+the trace layer (`trace.py`), the energy ledger (`ledger.py`) and the
+render-agnostic scene (`scene.py`, numpy only, `spiyweb[view]`).
 
 ### Boundary rules — the single most important thing in this file
 
@@ -225,28 +215,16 @@ web/                      # ONE front end, two products - React + Vite + TS
 3. **`evaluation/` is the Phase 1 product.** It becomes the regression suite
    later. It is never throwaway code. (Named `evaluation`, not `eval`, to avoid
    shadowing the Python builtin.)
-4. **The browser face is not a package DEPENDENCY — but half of it is
-   package CONTENT.** `pip install spiyweb` still pulls in nothing:
-   `dependencies = []`, and FastAPI, uvicorn and numpy all arrive through
-   `pip install "spiyweb[web]"`. What changed in Faz 2.5 is what the wheel
-   CARRIES. `spiyweb/viewer/` and the compiled bundle ship, because
-   `inspect_url()` has to work from an installed package — a viewer that
-   only runs inside a git checkout is a demo, not a feature. Three things
-   keep this from eroding the rule:
-   - **Nothing is imported eagerly.** `import spiyweb` still touches no
-     dependency; `spiyweb.viewer` defers every FastAPI-bound name and says
-     `pip install "spiyweb[web]"` when one is missing. The wheel job
-     measures this on the artifact, not on the checkout.
-   - **The measurement rig does NOT ship.** `server/runner.py`,
-     `system.py`, `stream.py` and the `data/` geography stay in the
-     repository. A library that carries a benchmark-run supervisor is Phase
-     3 leaking backwards into Phase 1.
-   - **One front end, two products.** `web/` builds a single bundle;
-     `/api/capabilities` tells the page which server it reached. A second
-     React app for the wheel would mean two canvases drifting apart.
-
-   `scene.py` and `ledger.py` are the same promotion for the same reason:
-   two front ends must draw one picture and audit one ledger.
+4. **`pip install spiyweb` pulls in nothing, and nothing is imported
+   eagerly.** `dependencies = []` is the packaging-level face of the
+   core-purity rule; numpy, FAISS, torch and spaCy all arrive through
+   extras, and `import spiyweb` touches none of them. The wheel job
+   measures this on the artifact, not on the checkout. Any interface that
+   replaces the removed browser face lives under the same rule: it may be
+   an extra, it may be a separate package, it is never a dependency — and
+   whatever it draws, it draws from `scene.py`, `ledger.py` and `trace.py`
+   rather than from a second copy of the layout, so one query produces one
+   picture no matter what asks for it.
 5. **Contradiction question templates live outside `core/`.** The library ships
    them so callers do not rewrite them, but the core only produces structured
    conflict data.
@@ -271,7 +249,7 @@ web/                      # ONE front end, two products - React + Vite + TS
 | Environment | **Python 3.11 + uv** |
 | Platforms | **macOS + Windows + Linux** — no OS-specific paths or calls; device order CUDA → MPS → CPU |
 | LLM provider | **Local-first (Ollama)**; free APIs (Gemini, OpenRouter, Groq) optional via config — the provider abstraction lives outside `core/` |
-| Packaging | **`src/spiyweb/` layout**; `eval/` → **`evaluation/`**; browser face as optional extra **`spiyweb[web]`** |
+| Packaging | **`src/spiyweb/` layout**; `eval/` → **`evaluation/`**; no browser face in the wheel (removed 2026-09-11) |
 | Repo / license | **Public from day one, Apache-2.0** |
 
 Because the repo is public from day one, `CLAUDE.local.md` must stay in
@@ -284,7 +262,7 @@ Because the repo is public from day one, `CLAUDE.local.md` must stay in
 | Phase | Contents | Gate to leave it |
 |---|---|---|
 | **1. Simple working version** | Graph, propagation, dedup, conflicts, eval harness, dev UI | Beat both baselines on MuSiQue by a meaningful margin |
-| **2. Browser face (UI)** | **CLOSED 2026-08-26.** Shipped: a stable public API (101 declared names, snapshot-tested, zero dependencies proved on the artifact), corpus-agnostic indexing and `SpiywebIndex`, a self-contained trace layer, a browser face that runs from the installed wheel (`inspect_url()`), the `spiyweb` terminal command, version `0.1.0`, and **corpus lint** — the plan-B diagnostic of orphans, hubs, duplicates, contradictions and empty layers. Not done: the TestPyPI upload (the owner's token), and four research-queue items with no signal — **contradiction detection** (measured in Phase 1 at 31.6% recall on 253 annotated pairs, 0% on same-passage ones, 9.5% end to end; the mechanism is correct and the detector is not yet a working feature, and fixing it needs the proposition layer rather than a threshold), the learned layer's useful form, query-time latency, and colour-count calibration | Signal, for any queue item |
+| **2. Browser face (UI)** | **CLOSED 2026-08-26.** Shipped: a stable public API (101 declared names, snapshot-tested, zero dependencies proved on the artifact), corpus-agnostic indexing and `SpiywebIndex`, a self-contained trace layer, a browser face that ran from the installed wheel (`inspect_url()`; **removed 2026-09-11**, the owner has a different interface in mind), the `spiyweb` terminal command, version `0.1.0`, and **corpus lint** — the plan-B diagnostic of orphans, hubs, duplicates, contradictions and empty layers. Not done: the TestPyPI upload (the owner's token), and four research-queue items with no signal — **contradiction detection** (measured in Phase 1 at 31.6% recall on 253 annotated pairs, 0% on same-passage ones, 9.5% end to end; the mechanism is correct and the detector is not yet a working feature, and fixing it needs the proposition layer rather than a threshold), the learned layer's useful form, query-time latency, and colour-count calibration | Signal, for any queue item |
 | **3. Framework / ecosystem** | Ingestion, LLM calls, orchestration; distributable as a skill | — |
 
 The order above is a **tentative revision** from the owner and may change. Two

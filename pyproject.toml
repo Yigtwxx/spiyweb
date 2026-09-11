@@ -37,15 +37,6 @@ embed = ["sentence-transformers>=3.0"]
 entity = ["spacy>=3.7"]
 # Index-time NLI contradiction marking (D26): the real model wrapper only.
 nli = ["torch>=2.2", "transformers>=4.40"]
-# The browser face: a FastAPI process serving `web/`. Like `ui`, it lives in
-# the repository rather than in the wheel - `dependencies = []` is the rule
-# that keeps the propagation core free of all of this.
-web = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
-    "spiyweb[store]",
-    "spiyweb[view]",
-]
 index = ["spiyweb[store]", "spiyweb[embed]", "spiyweb[entity]"]
 
 # One terminal command, four verbs, each wrapping something the Python API
@@ -60,10 +51,7 @@ Homepage = "https://github.com/Yigtwxx/spiyweb"
 Source = "https://github.com/Yigtwxx/spiyweb"
 
 [dependency-groups]
-# `httpx` is not a runtime dependency of anything: `fastapi.testclient` needs
-# it, and the `web` extra deliberately does not carry a test client into a
-# user's environment.
-dev = ["pytest>=8.0", "ruff>=0.6", "httpx>=0.27"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
 
 # The version has ONE source: `__init__.py`. A second copy in this file
 # drifts sooner or later, and a drifted version number lies about which
@@ -71,32 +59,21 @@ dev = ["pytest>=8.0", "ruff>=0.6", "httpx>=0.27"]
 [tool.hatch.version]
 path = "src/spiyweb/__init__.py"
 
-# `[tool.hatch.build]` and not the wheel target alone: `uv build` (or
-# `python -m build`) builds the SDIST first and then builds the wheel FROM
-# that sdist. Naming the bundle only under the wheel target meant the sdist
-# excluded it - it is gitignored - and the wheel built from that sdist came
-# out 229 KB with no page in it, while `uv build --wheel` produced the right
-# 1.4 MB artifact. Two commands, two different wheels, and the broken one is
-# the one a release would have used. Found 2026-08-26, before any upload.
-[tool.hatch.build]
-# The compiled browser bundle is gitignored - a public history has no business
-# carrying minified JavaScript - and gitignored files are excluded by default,
-# so it has to be named here to reach either artifact. Named as a pattern
-# rather than force-included: a checkout that never ran `npm run build` simply
-# ships no bundle, and the viewer says so in a sentence, instead of the build
-# failing on a missing directory.
-artifacts = ["src/spiyweb/viewer/static/**/*"]
-
+# Anything gitignored that must reach an artifact goes under
+# `[tool.hatch.build]`, not the wheel target: `uv build` makes the sdist
+# first and builds the wheel FROM it, so a wheel-only entry ships nothing.
+# (Learned on 2026-08-26 with the browser bundle, since removed.)
 [tool.hatch.build.targets.wheel]
 packages = ["src/spiyweb"]
 
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-# `server` joins the first-party roots so isort keeps `server.*` out of the
-# third-party block; the package itself still ships only `src/spiyweb`.
-src = ["src", "tests", "server"]
-extend-exclude = ["web"]
+src = ["src", "tests"]
+# `line-ending` stays at its `auto` default on purpose. `.gitattributes`
+# pins LF in the repository; a checkout under `core.autocrlf=true` is CRLF
+# on disk, and forcing `lf` here would fail `ruff format --check` on every
+# file of exactly that checkout.
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ANN", "RUF"]
@@ -108,9 +85,5 @@ select = ["E", "F", "I", "UP", "B", "ANN", "RUF"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# The repo root only: `server/` is a repository package rather than a wheel
-# package, so nothing installs it onto sys.path for the test run. `ui/` used
-# to be here too, for a bare `import graph_view`; that module now lives in
-# the package as `spiyweb.scene` and needs no path help.
 pythonpath = ["."]
 addopts = "-q"

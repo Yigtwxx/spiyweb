@@ -127,3 +127,34 @@ def test_config_validation_rejects_bad_values() -> None:
         ThermalConfig(residue_ratio=1.0)
     with pytest.raises(ValueError, match="min_overlap"):
         ThermalConfig(min_overlap=1.5)
+
+
+def test_a_session_with_no_preference_runs_the_default_profile() -> None:
+    """Same rule as `SpiywebIndex.retrieve()`: silence means `explore`."""
+    from spiyweb import DEFAULT_PROFILE, PROFILES
+
+    session = ThermalSession(FakeIndex(), CHAIN)
+    assert session.profile == DEFAULT_PROFILE
+    assert session.config.propagation.damping == PROFILES[DEFAULT_PROFILE].damping
+
+
+def test_a_session_given_a_config_runs_it_as_given() -> None:
+    mine = RetrievalConfig(seed_width=3)
+    session = ThermalSession(FakeIndex(), CHAIN, mine)
+    assert session.profile == ""
+    assert session.config == mine
+
+
+def test_a_session_profile_overlays_the_given_config() -> None:
+    from spiyweb import PRECISE
+
+    mine = RetrievalConfig(seed_width=3, contact_overfetch=7)
+    session = ThermalSession(FakeIndex(), CHAIN, mine, profile="precise")
+    assert session.profile == "precise"
+    assert session.config.seed_width == PRECISE.seed_width
+    assert session.config.contact_overfetch == 7
+
+
+def test_a_session_refuses_an_unknown_profile() -> None:
+    with pytest.raises(ValueError, match="compare"):
+        ThermalSession(FakeIndex(), CHAIN, profile="fast")

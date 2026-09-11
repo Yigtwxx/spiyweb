@@ -1,6 +1,6 @@
 """`spiyweb` with no arguments: one word to type, then questions.
 
-The five verbs are discoverable from `--help`, and `--help` is where nobody
+The four verbs are discoverable from `--help`, and `--help` is where nobody
 looks. Someone trying this library for the first time has an index they built
 five minutes ago and a question they want to ask it; making them learn a
 subcommand and type a path first is a tax on exactly the moment that decides
@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING
 from spiyweb import __version__
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
 __all__ = ["interactive", "is_interactive", "run_wizard"]
 
@@ -140,6 +140,7 @@ def _read_key_windows() -> str:
 
 
 def _read_key_posix() -> str:  # pragma: no cover - exercised off Windows
+    import select
     import termios
     import tty
 
@@ -149,12 +150,29 @@ def _read_key_posix() -> str:  # pragma: no cover - exercised off Windows
         tty.setraw(descriptor)
         char = sys.stdin.read(1)
         if char == "\x1b":
-            # An arrow is ESC [ A/B; a bare ESC is somebody leaving.
-            following = sys.stdin.read(2)
-            return {"[A": UP, "[B": DOWN}.get(following, QUIT_KEY)
+            return _decode_escape(
+                pending=lambda: bool(select.select([sys.stdin], [], [], 0.05)[0]),
+                read=sys.stdin.read,
+            )
     finally:
         termios.tcsetattr(descriptor, termios.TCSADRAIN, saved)
     return _classify(char)
+
+
+def _decode_escape(pending: Callable[[], bool], read: Callable[[int], str]) -> str:
+    """What follows an ESC byte on a POSIX terminal, without ever blocking.
+
+    An arrow arrives as `ESC [ A` (or `ESC O A` in application mode) in one
+    burst; a bare ESC is somebody leaving, and NOTHING follows it. A blocking
+    read after the ESC would therefore wait for two keys that never come and
+    the menu would freeze - so the caller asks `pending` first, with a short
+    timeout, and only reads what is actually there.
+    """
+    if not pending():
+        return QUIT_KEY
+    if read(1) not in ("[", "O"):
+        return ""
+    return {"A": UP, "B": DOWN}.get(read(1), "")
 
 
 def _classify(char: str) -> str:
@@ -332,31 +350,26 @@ def ask_text(question: str, *, default: str = "") -> str | None:
     return answer or default
 
 
-def discover() -> tuple[list[Found], list[Found]]:
-    """Find indexes and trace files nearby, so nobody has to type a path.
+def discover() -> list[Found]:
+    """Find indexes nearby, so nobody has to type a path.
 
-    An index is a directory holding `nodes.json`; a trace store is a
-    `traces.jsonl`. Both tests are the same ones the CLI's own verbs use, so
-    what the wizard offers is exactly what those verbs will accept.
+    An index is a directory holding `nodes.json` - the same test the CLI's
+    own verbs use, so what the wizard offers is exactly what they accept.
     """
-    from spiyweb.trace import TRACE_FILENAME
-
     indexes: list[Found] = []
-    traces: list[Found] = []
     seen: set[Path] = set()
     for root in SEARCH_ROOTS:
         base = Path(root)
         if not base.is_dir():
             continue
-        for entry in sorted(base.iterdir()):
+        # Case-folded so the menu order is the same on every platform.
+        for entry in sorted(base.iterdir(), key=lambda p: p.name.casefold()):
             if not entry.is_dir() or entry.resolve() in seen:
                 continue
             seen.add(entry.resolve())
             if (entry / "nodes.json").is_file():
                 indexes.append(Found(entry, "index", _atom_count(entry)))
-            if (entry / TRACE_FILENAME).is_file():
-                traces.append(Found(entry / TRACE_FILENAME, "traces", ""))
-    return indexes[:MAX_DISCOVERED], traces[:MAX_DISCOVERED]
+    return indexes[:MAX_DISCOVERED]
 
 
 def _atom_count(index: Path) -> str:
@@ -374,7 +387,7 @@ def _pick_index(question: str) -> str | None:
     """Choose a discovered index, or type a path. `None` means quit."""
     from spiyweb.terminal import paint
 
-    indexes, _ = discover()
+    indexes = discover()
     if not indexes:
         print()
         print(
@@ -415,7 +428,6 @@ def run_wizard() -> int:
         [
             ("query", "Ask a question", "the web spreads and you see what lit up"),
             ("lint", "Inspect a corpus", "islands, hubs, duplicates - no query needed"),
-            ("view", "Open the viewer", "a browser page of what was retrieved"),
             ("index", "Build an index", "a folder of .txt/.md becomes a graph"),
             ("version", "What is installed", "which extras you have, which you lack"),
         ],
@@ -481,26 +493,6 @@ def _build(action: str) -> list[str] | None:
     if action == "lint":
         index = _pick_index("Which corpus?")
         return None if index is None else ["lint", index]
-
-    if action == "view":
-        indexes, traces = discover()
-        options: list[tuple[str, ...]] = [
-            (
-                str(found.path),
-                str(found.path),
-                f"live index, {found.detail}".rstrip(", "),
-            )
-            for found in indexes
-        ]
-        options += [
-            (str(found.path), str(found.path), "recorded calls, no index loaded")
-            for found in traces
-        ]
-        if not options:
-            target = ask_text("Path to an index or a traces.jsonl:")
-            return None if target is None else ["view", target]
-        chosen = choose("What should the viewer show?", options)
-        return None if chosen is None else ["view", chosen]
 
     return None
 

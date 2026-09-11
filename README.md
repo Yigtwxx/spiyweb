@@ -53,15 +53,14 @@ entire value proposition.
 
 ## Try it
 
-Four commands, from an empty directory to a picture of what the retrieval did:
+Three commands, from an empty directory to what the retrieval did:
 
 ```bash
-pip install "spiyweb[index,web]"
+pip install "spiyweb[index]"
 python -m spacy download en_core_web_sm
 
 spiyweb index docs/ my-index          # a directory of .txt/.md -> an index
 spiyweb query my-index "what happened afterwards"
-spiyweb view my-index                 # opens the browser face on a link
 spiyweb lint my-index                 # what is wrong with the CORPUS
 ```
 
@@ -130,11 +129,12 @@ build_index(
 )
 
 with spiyweb.open_index("data/mydocs") as index:
-    answer = index.retrieve("who signed off on the change?", profile="explore")
+    answer = index.retrieve("who signed off on the change?", profile="precise")
 
     for passage in answer.passages:
         print(f"{passage.energy:5.2f}  {passage.votes} votes  {passage.text[:70]}")
 
+    print(answer.profile)  # which profile ran; "explore" when you named none
     print(answer.confidence)  # total energy, node count, hop depth
     print(answer.dedup_mode)  # which duplicate rules actually ran
     for path in answer.paths():  # how the energy reached each node
@@ -145,6 +145,12 @@ There is no `k`. The web stops when its energy falls below the threshold -
 that self-termination is the argument against `top-k`, so a `k=` parameter
 here would quietly reintroduce the thing being argued against. Slice
 `answer.passages` if you want fewer.
+
+`profile` is optional. Name none and pass no `config`, and the library runs
+`explore` (`spiyweb.DEFAULT_PROFILE`) - the bare `RetrievalConfig()` carries
+the canonical worked example above and cannot spread past five seeds, so it
+is what you get only when you build it yourself, and `retrieve()` warns if
+what you built cannot leave hop 0.
 
 `open_index` wires duplicate suppression correctly, which is not a detail:
 the mechanism needs a config AND a similarity backend, and this project's own
@@ -182,26 +188,12 @@ RAPTOR). Spiyweb's claimed differentiators are elsewhere:
 - **The web stops itself.** Termination is a relative energy threshold, not a
   "return N results" parameter.
 
-## Interfaces
+## Traces
 
-### See what your retrieval did
-
-Every query an open index answers is recorded, and the viewer ships with the
-package:
-
-```python
-import spiyweb
-
-index = spiyweb.open_index("my-index")
-answer = index.retrieve("what happened afterwards")
-print(index.inspect_url())  # http://127.0.0.1:PORT/?token=...
-```
-
-The link opens the activated web, the energy ledger and the activation path
-of every atom — for the calls your application actually made, not for a demo
-query. It binds `127.0.0.1` only, takes a port the OS picks so it never
-fights your own server, and guards every API route with a token minted for
-that process.
+Every query an open index answers is recorded as a self-contained trace:
+the activated subgraph, the passages' text, the energy ledger and the
+settings the call ran with. Nothing else is needed to read it back - no
+index, no store, no dependency.
 
 Traces are held in memory (the last 200) and cost no disk unless asked:
 
@@ -212,45 +204,16 @@ index = spiyweb.open_index("my-index", trace=spiyweb.TraceConfig(directory="trac
 That writes JSONL, and a machine that holds no index can read it back:
 
 ```python
-from spiyweb.viewer import serve_file
+from spiyweb import load_traces
 
-with serve_file("traces/traces.jsonl") as viewer:
-    print(viewer.url)
+for record in load_traces("traces/traces.jsonl"):
+    print(record.query, record.profile, record.ledger)
 ```
 
-Needs `pip install "spiyweb[web]"`; the library itself still installs with no
-dependencies at all.
-
-### The measurement rig
-
-`server/` + `web/` — a FastAPI process in front of the library, and a
-Vite/React front end. This half stays in the repository: it owns `data/` and
-supervises benchmark runs, and neither belongs in somebody else's wheel.
-
-```bash
-pip install -e ".[web]"
-cd web && npm install && npm run build && cd ..
-python -m uvicorn server.app:app --port 8000   # http://localhost:8000
-```
-
-The built front end is served by that same process, so there is one origin and
-nothing else to start. For front-end work, `npm run dev` in `web/` gives hot
-reload on port 5173 and proxies `/api` to the server.
-
-Two views. *Inspect* runs one query and shows the activated web against plain
-`top-k` side by side, the activation paths, and — the part that matters — an
-**energy ledger**: how the injected energy split into held, dissipated and
-destroyed. §2.1 claims dedup only ever redistributes energy while
-contradictions, negative seeds and negative-polarity atoms destroy it; the
-ledger audits that claim on every query and says so out loud when the numbers
-fail to add up. *Runs* watches a measurement live (progress, GPU against the
-88% budget, results with paired bootstrap intervals) and can start or stop
-one — behind a plan-then-type-to-confirm flow, because a stray click here
-costs hours.
-
-The scene and layout code is not the front end's: it lives in the package as
-`spiyweb.scene` (numpy only, `spiyweb[view]`), so one query produces one
-picture no matter what asks for it.
+The layout of a recorded call - hop rings, layers, a side-by-side against
+plain `top-k` - lives in `spiyweb.scene` (numpy only, `spiyweb[view]`), so
+one query produces one picture no matter what draws it. The browser face
+that used to draw it was removed after 0.1.2; what replaces it is open.
 
 ## Phase 1 plan
 

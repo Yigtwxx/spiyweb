@@ -234,3 +234,65 @@ def test_a_profile_overlays_only_its_three_knobs(tmp_path: Path) -> None:
     assert wide.confidence.total_energy >= narrow.confidence.total_energy, (
         "a higher damping forwards more energy onward, so more of it survives"
     )
+
+
+def test_no_preference_means_the_default_profile(tmp_path: Path) -> None:
+    """The 0.1.2 trap, closed in the library and not just the terminal.
+
+    `RetrievalConfig()` cannot spread past five seeds, so a caller who names
+    no profile and builds no config must not silently get top-k. The answer
+    and the trace both say which profile ran.
+    """
+    from spiyweb.profiles import DEFAULT_PROFILE, PROFILES
+
+    _build(tmp_path)
+    with open_index(tmp_path, embedder=FakeEmbedder()) as index:
+        answer = index.retrieve("who raised the tower")
+
+    assert answer.profile == DEFAULT_PROFILE
+    assert answer.trace is not None and answer.trace.profile == DEFAULT_PROFILE
+    assert answer.config is not None
+    expected = PROFILES[DEFAULT_PROFILE]
+    assert answer.config.propagation.damping == expected.damping
+    assert answer.config.propagation.threshold_ratio == expected.threshold_ratio
+    assert answer.config.seed_width == expected.seed_width
+
+
+def test_a_config_given_at_the_call_is_never_overlaid(tmp_path: Path) -> None:
+    from spiyweb.config import RetrievalConfig
+
+    _build(tmp_path)
+    mine = RetrievalConfig(seed_width=3)
+    with open_index(tmp_path, embedder=FakeEmbedder()) as index:
+        answer = index.retrieve("who raised the tower", config=mine)
+
+    assert answer.profile == ""
+    assert answer.config == mine, "a config the caller built is theirs as built"
+    assert answer.trace is not None and answer.trace.profile == ""
+
+
+def test_a_config_given_at_open_counts_as_a_preference(tmp_path: Path) -> None:
+    from spiyweb.config import RetrievalConfig
+
+    _build(tmp_path)
+    mine = RetrievalConfig(seed_width=3)
+    with open_index(tmp_path, embedder=FakeEmbedder(), config=mine) as index:
+        answer = index.retrieve("who raised the tower")
+
+    assert answer.profile == ""
+    assert answer.config == mine
+
+
+def test_a_named_profile_wins_over_any_config(tmp_path: Path) -> None:
+    from spiyweb.config import RetrievalConfig
+    from spiyweb.profiles import PRECISE
+
+    _build(tmp_path)
+    mine = RetrievalConfig(seed_width=3, contact_overfetch=7)
+    with open_index(tmp_path, embedder=FakeEmbedder(), config=mine) as index:
+        answer = index.retrieve("who raised the tower", profile="precise")
+
+    assert answer.profile == "precise"
+    assert answer.config is not None
+    assert answer.config.propagation.damping == PRECISE.damping
+    assert answer.config.contact_overfetch == 7, "only the three knobs move"

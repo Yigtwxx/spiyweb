@@ -9,7 +9,6 @@ of evidence about what happens when one mechanism has two implementations.
     spiyweb version                       what is installed, and what is not
     spiyweb index docs/ my-index          a directory of text files -> an index
     spiyweb query my-index "a question"   the activated web, as text
-    spiyweb view my-index                 the browser face, on a link
     spiyweb lint my-index                 what is wrong with the CORPUS
 
 Importing this module costs nothing. `spiyweb version` has to work on a bare
@@ -28,6 +27,7 @@ from typing import TYPE_CHECKING
 
 from spiyweb import __version__
 from spiyweb.config import CorpusLintConfig as CorpusLintDefaults
+from spiyweb.profiles import DEFAULT_PROFILE
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -70,21 +70,6 @@ what retrieval can do at all, so each gets the loud colour."""
 LINT_WORST = 10
 """Rows of the "most affected" roll-up. A corpus owner acts on a handful."""
 
-DEFAULT_PROFILE = "explore"
-"""The profile `query` uses when none is named, and the reason is arithmetic
-rather than taste.
-
-`RetrievalConfig()` splits 10.0 energy among 5 seeds and stops at 15% of it,
-so the strongest seed forwards at most 1.23 against a threshold of 1.50 -
-nothing can ever clear it and the web returns first contact only. That is
-`top-k` with extra steps, which is the one thing this project exists to not
-be, and it is what a first-time reader would have seen.
-
-The library default stays where CLAUDE.md §2.1 put it: it carries the
-canonical worked example, and no measured number may move. The TERMINAL is
-where a person meets the mechanism, so the terminal picks a profile that can
-actually show it - and prints which one, so nothing is hidden."""
-
 DEFAULT_TOP = 10
 """Passages `query` prints. NOT a `top-k`: the web already stopped itself,
 and this only decides how much of its answer fits on a terminal screen."""
@@ -94,7 +79,6 @@ EXTRAS = {
     "embed": ("sentence_transformers",),
     "entity": ("spacy",),
     "view": ("numpy",),
-    "web": ("fastapi", "uvicorn"),
     "nli": ("torch", "transformers"),
 }
 """Extra -> the imports that prove it is installed. Used by `version` only,
@@ -170,15 +154,23 @@ def _read_documents(
 
     if not root.is_dir():
         raise Problem(f"{root} is not a directory")
-    paths = sorted(
+    # The suffix test is on the lowercased name rather than an `rglob` per
+    # suffix: `rglob("*.txt")` matches `README.TXT` on Windows and skips it
+    # on macOS and Linux, and a corpus must not depend on where it was
+    # indexed. The sort key is the posix relative path - the string that
+    # becomes the source id - so document order, and with it every
+    # positional artifact, is identical on all three platforms.
+    found = (
         root.rglob(pattern)
         if pattern
-        else (path for suffix in TEXT_SUFFIXES for path in root.rglob(f"*{suffix}"))
+        else (p for p in root.rglob("*") if p.suffix.lower() in TEXT_SUFFIXES)
+    )
+    paths = sorted(
+        (path for path in found if path.is_file()),
+        key=lambda path: path.relative_to(root).as_posix(),
     )
     documents: list[DocumentInput] = []
     for path in paths:
-        if not path.is_file():
-            continue
         text = path.read_text(encoding="utf-8", errors="replace")
         units = (
             [text] if whole else [part for part in text.split("\n\n") if part.strip()]
@@ -449,54 +441,6 @@ def _lint(args: argparse.Namespace) -> int:
     return 0
 
 
-# --- view ------------------------------------------------------------------
-
-
-def _view(args: argparse.Namespace) -> int:
-    """Open the browser face on an index, or on a trace file it wrote."""
-    try:
-        from spiyweb.viewer import serve_file, serve_index
-    except ImportError as missing:
-        raise Problem(
-            f'{missing}\nthe browser face needs: pip install "spiyweb[web]"'
-        ) from missing
-
-    target = Path(args.path)
-    if _is_index(target):
-        # Said BEFORE the load, and flushed: merging a large index's edge
-        # layers and rebuilding its FAISS store takes seconds to a minute,
-        # and a command that prints nothing while it does that looks hung.
-        _progress(f"opening index {target} - this reads the whole graph")
-        handle = serve_index(_open(target), port=args.port)
-        source = f"index {target}"
-    elif _traces_at(target) is not None:
-        handle = serve_file(_traces_at(target), port=args.port)  # type: ignore[arg-type]
-        source = f"traces {_traces_at(target)}"
-    else:
-        raise Problem(
-            f"{target} is neither an index directory (no nodes.json) nor a "
-            "trace file. Point this at what `spiyweb index` wrote, or at the "
-            "traces.jsonl an application recorded"
-        )
-
-    _say(f"spiyweb viewer on {source}")
-    _say(f"  {handle.url}")
-    _say("  loopback only; the token in that link is this process's own")
-    if not args.no_browser:
-        import webbrowser
-
-        webbrowser.open(handle.url)
-    print("\nCtrl-C to stop.")
-    try:
-        while handle.running:
-            handle._thread.join(timeout=0.5)
-    except KeyboardInterrupt:
-        print("\nstopping")
-    finally:
-        handle.stop()
-    return 0
-
-
 def _progress(message: str) -> None:
     """A line about the work, on stderr.
 
@@ -508,29 +452,8 @@ def _progress(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
-def _say(message: str) -> None:
-    """Print and FLUSH.
-
-    `view` blocks on a server after printing the link, and Python
-    block-buffers stdout whenever it is not a terminal. Without the flush the
-    URL sits in the buffer until the process exits, so anything that pipes
-    this command - a script, a notebook cell, a log - sees nothing at all and
-    concludes it hung. It did not hang; it was never heard.
-    """
-    print(message, flush=True)
-
-
 def _is_index(path: Path) -> bool:
     return path.is_dir() and (path / "nodes.json").is_file()
-
-
-def _traces_at(path: Path) -> Path | None:
-    from spiyweb.trace import TRACE_FILENAME
-
-    if path.is_file():
-        return path
-    candidate = path / TRACE_FILENAME
-    return candidate if candidate.is_file() else None
 
 
 def _open(path: Path | str, **options: object) -> SpiywebIndex:
@@ -594,8 +517,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("precise", "explore", "compare"),
         help=(
             f"damping, threshold and seed width as one package "
-            f"(default {DEFAULT_PROFILE}; the bare library default cannot "
-            "spread past the seed)"
+            f"(default {DEFAULT_PROFILE}, the same as the library's)"
         ),
     )
     query.add_argument(
@@ -632,13 +554,6 @@ def build_parser() -> argparse.ArgumentParser:
     lint.add_argument("--json", action="store_true", help="machine-readable")
     lint.set_defaults(handler=_lint)
 
-    view = subs.add_parser("view", help="open the browser face on an index or traces")
-    view.add_argument("path", type=Path, help="an index directory or a traces.jsonl")
-    view.add_argument(
-        "--port", type=int, default=0, help="0 (the default) lets the OS pick"
-    )
-    view.add_argument("--no-browser", action="store_true", help="just print the link")
-    view.set_defaults(handler=_view)
     return parser
 
 

@@ -25,6 +25,100 @@ Two rules hold from the first tagged release onwards:
 `spiyweb.evaluation` is the measurement harness, not the library. It is the
 regression suite, and its CLI flags are not covered by the policy above.
 
+## [Unreleased]
+
+### Changed
+
+- **The library default can spread.** 0.1.2 moved the terminal and the
+  viewer onto the `explore` profile and left `SpiywebIndex.retrieve()` at a
+  warning, so a first-time caller of the LIBRARY still got first contact
+  only - top-k with extra steps, silently unless they read stderr. Now
+  `SpiywebIndex.retrieve()` and `ThermalSession` apply `DEFAULT_PROFILE`
+  (`explore`) whenever the caller expresses no preference: no `profile`,
+  and no `config` at the call or at `open()`. A config the caller built is
+  never overlaid - it runs as given, and `retrieve()` still warns if it
+  cannot spread. `retrieve_colored()` is unchanged: `ColoredRetrievalConfig()`
+  is the measured operating point and clears the bar on every colour.
+
+  **No measured number moves.** `RetrievalConfig()` and `PropagationConfig()`
+  keep the canonical trace of CLAUDE.md §2.6; the evaluation harness calls
+  the `retrieve()` primitive with its own configs and never passes through
+  `SpiywebIndex`. On the tiny four-passage test corpus the default now runs
+  at damping .75 / threshold .01 / width 8 instead of .60 / .15 / 5, which is
+  why the two ledger tests rebuild their expectation from the config the
+  answer reports rather than from `RetrievalConfig()`.
+
+### Added
+
+- `spiyweb.DEFAULT_PROFILE`: the one source of the name the terminal, the
+  viewer and the library all fall back to. The two `"explore"` literals in
+  `cli.py` and `viewer/app.py` are gone.
+- `Answer.profile` and `Answer.config`: which profile ran and the resolved
+  configuration it produced, so a caller never has to infer either. The
+  trace record's `profile` field now carries the resolved name instead of
+  `""` when the default applied.
+- `ThermalSession(profile=...)`, with the same overlay rule and the same
+  default as `SpiywebIndex.retrieve()`; `.profile` and `.config` report what
+  the session runs with.
+
+### Fixed
+
+- **The wizard froze on a bare ESC on macOS and Linux.** The POSIX key reader
+  did a blocking `read(2)` after every ESC byte to see whether an arrow
+  followed, and on a bare ESC - the key the menu documents as "leave" -
+  nothing follows, so the menu waited for two keystrokes that never came.
+  The reader now polls with a 50 ms `select` before reading, and the decoder
+  is a pure function tested on every CI leg, including `ESC O A`
+  application-mode arrows. The Windows path never had the problem.
+- **The measurement rig's child was shielded from Ctrl-C on Windows only.**
+  `server/runner.py` gave the run its own process group with
+  `CREATE_NEW_PROCESS_GROUP` and nothing at all on POSIX, where a Ctrl-C at
+  the server's terminal reached the whole foreground group and killed the
+  run the comment said it was protecting. One helper now emits
+  `start_new_session=True` on POSIX and the flag on Windows; both launch
+  sites use it.
+- **`spiyweb index` skipped `README.TXT` on macOS and Linux.** The directory
+  walk did one `rglob` per suffix, and `rglob("*.txt")` is case-insensitive
+  on Windows only. The suffix is now tested on the lowercased name, and the
+  documents are ordered by their posix relative path - the string that
+  becomes the source id - instead of by `Path` comparison, which is
+  case-insensitive on Windows and byte-wise elsewhere. Two machines indexing
+  the same directory now produce the same `nodes.json` in the same order.
+  The wizard's index menu and the rig's index list sort case-folded for the
+  same reason.
+### Removed
+
+- **The browser face, entirely.** `spiyweb.viewer` (the FastAPI page,
+  `inspect_url()`, `serve_index` / `serve_file`, the loopback-token
+  serving), the `spiyweb view` verb and the wizard's "Open the viewer"
+  entry, the `[web]` extra, the React/Vite front end under `web/`, the
+  `server/` measurement rig (routes, SSE, the run supervisor) and the CI jobs
+  that built and packed the bundle. The owner has a different interface in
+  mind, and a page nobody will keep is a page that rots in the wheel.
+
+  A MINOR-bump removal by the policy at the top of this file, so the next
+  version is **0.2.0**. `SpiywebIndex.inspect_url()` is gone with no
+  replacement path; every other public name is untouched, and the
+  zero-dependency wheel is now checked against five heavy modules instead
+  of seven, because pydantic and FastAPI no longer have a way in.
+
+  What stayed is what any interface needs and none of this depended on: the
+  trace layer (`TraceRecord`, `load_traces`, JSONL on disk), the energy
+  ledger and the render-agnostic `spiyweb.scene` (`[view]`, numpy only) -
+  including the 2026-09-03 canvas fixes that moved the ring-spacing rule
+  into `scene.ring_radii()`, since the rule belongs to the scene and not to
+  whatever draws it.
+- The `dev` dependency group dropped `httpx`, which only the viewer's test
+  client used.
+
+### Internal
+
+- `.gitattributes` pins LF for every text file. The tree has always been
+  LF; this stops a Windows clone without `core.autocrlf` from committing
+  CRLF and failing `ruff format --check` on the Linux and macOS legs. Ruff's
+  `line-ending` stays `auto`, because a checkout under `autocrlf=true` is
+  CRLF on disk and `lf` would fail that same check locally.
+
 ## [0.1.2] - 2026-08-26
 
 ### Changed
@@ -75,7 +169,11 @@ regression suite, and its CLI flags are not covered by the policy above.
   If the route is reached anyway it answers `503` with that same line instead
   of a 500.
 
-## [Unreleased]
+## [0.1.2] - 2026-08-26, Phase 2 close-out
+
+Written before the release-day fixes above and left under an `Unreleased`
+heading when the three 0.1.x versions were published from one commit
+(`b2d3fbd`); every entry below is in the 0.1.2 wheel.
 
 ### Added
 

@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from spiyweb.config import ColoredRetrievalConfig, RetrievalConfig, TraceConfig
+from spiyweb.config import ColoredRetrievalConfig, TraceConfig
 from spiyweb.ledger import build_ledger
 from spiyweb.trace import SCHEMA_VERSION, TraceRecord, TraceStore, load_traces
 
@@ -110,8 +110,9 @@ def test_a_trace_carries_its_own_energy_ledger(
     record = index.traces.latest()
     assert record is not None and record.ledger is not None
 
+    assert answer.config is not None
     expected = build_ledger(
-        answer.result.propagation, index.graph, RetrievalConfig().propagation
+        answer.result.propagation, index.graph, answer.config.propagation
     )
     assert record.ledger.injected == pytest.approx(expected.injected)
     assert record.ledger.held == pytest.approx(expected.held)

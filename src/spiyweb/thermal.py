@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from spiyweb.config import RetrievalConfig, ThermalConfig
+from spiyweb.profiles import DEFAULT_PROFILE, PROFILES
 from spiyweb.retrieve import RetrievalResult, SeedSource, retrieve
 
 if TYPE_CHECKING:
@@ -52,13 +53,37 @@ class ThermalSession:
         graph: Graph,
         config: RetrievalConfig | None = None,
         *,
+        profile: str | None = None,
         thermal: ThermalConfig | None = None,
     ) -> None:
+        """`profile` overlays its three knobs onto `config`, exactly as
+        `SpiywebIndex.retrieve()` does - and with the same default: neither
+        given means `DEFAULT_PROFILE`, because the bare `RetrievalConfig()`
+        cannot spread past five seeds. A config you did give runs as given.
+        """
         self._index = index
         self._graph = graph
-        self._config = config if config is not None else RetrievalConfig()
+        if profile is None and config is None:
+            profile = DEFAULT_PROFILE
+        if profile is not None and profile not in PROFILES:
+            raise ValueError(
+                f"unknown profile {profile!r}; pick one of {sorted(PROFILES)}"
+            )
+        base = config if config is not None else RetrievalConfig()
+        self._config = PROFILES[profile].as_retrieval(base) if profile else base
+        self._profile = profile or ""
         self._thermal = thermal if thermal is not None else ThermalConfig()
         self._previous: PropagationResult | None = None
+
+    @property
+    def profile(self) -> str:
+        """The profile in the running config; `""` when a raw config runs."""
+        return self._profile
+
+    @property
+    def config(self) -> RetrievalConfig:
+        """The configuration every turn of this session runs with."""
+        return self._config
 
     @property
     def warm(self) -> bool:

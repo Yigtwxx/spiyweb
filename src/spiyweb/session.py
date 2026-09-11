@@ -27,7 +27,6 @@ Two things it deliberately does NOT do:
 
 from __future__ import annotations
 
-import threading
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -54,7 +53,7 @@ from spiyweb.output import (
     gap_warnings,
     theme_clusters,
 )
-from spiyweb.profiles import PROFILES, Profile
+from spiyweb.profiles import DEFAULT_PROFILE, PROFILES, Profile
 from spiyweb.retrieve import retrieve as _retrieve
 from spiyweb.retrieve import retrieve_colored as _retrieve_colored
 from spiyweb.trace import TraceStore, build_trace
@@ -79,7 +78,6 @@ if TYPE_CHECKING:
     )
     from spiyweb.store import VectorStore
     from spiyweb.trace import TraceRecord
-    from spiyweb.viewer import ViewerHandle
 
 __all__ = ["Answer", "ColoredAnswer", "Passage", "SpiywebIndex", "open_index"]
 
@@ -123,6 +121,11 @@ class Answer:
     graph: Graph = field(repr=False)
     trace: TraceRecord | None = field(default=None, repr=False)
     """This call's trace record, or `None` while tracing is off (D38)."""
+    profile: str = ""
+    """The profile this call ran - `DEFAULT_PROFILE` when the caller named
+    none and supplied no config, `""` when a raw config ran as given."""
+    config: RetrievalConfig | None = field(default=None, repr=False)
+    """The resolved configuration the web actually ran with."""
 
     @property
     def confidence(self) -> Confidence:
@@ -200,9 +203,9 @@ class SpiywebIndex:
     """An index directory, opened once and queried many times.
 
     Loading is the expensive part - a graph merge, a FAISS rebuild and a text
-    map - so it happens once here instead of per query. That is also why the
-    browser face's own resource cache collapses onto this class rather than
-    keeping a second copy of everything in memory.
+    map - so it happens once here instead of per query, and anything that
+    serves an index should hold one of these rather than a second copy of
+    everything in memory.
     """
 
     def __init__(
@@ -230,13 +233,13 @@ class SpiywebIndex:
         self._manifest = manifest
         self._negative = negative
         self._embedder = embedder
-        self._config = config if config is not None else RetrievalConfig()
+        # `None` is kept, not replaced: it is how `_resolve` knows the caller
+        # expressed no preference and the default profile may apply.
+        self._config: RetrievalConfig | None = config
         self._dedup = dedup if dedup is not None else DedupConfig()
         self._conflict = conflict if conflict is not None else ConflictConfig()
         self._polarity = polarity if polarity is not None else PolarityConfig()
         self._traces = TraceStore(trace)
-        self._viewer: ViewerHandle | None = None
-        self._viewer_lock = threading.Lock()
         self._checked_model = False
         # Votes are per DOCUMENT, never per chunk (D7): repetition inside
         # one source is not corroboration. `retrieve` derives the
@@ -311,8 +314,8 @@ class SpiywebIndex:
         Holding an index is not the same as being able to ask it something:
         `retrieve()` needs an embedder, and on an install without the
         `embed` extra there is none. A caller that offers a search box has
-        to know the difference - the browser face offered one on an install
-        without sentence-transformers and the button returned an opaque 500.
+        to know the difference - the first browser face offered one on an
+        install without sentence-transformers and returned an opaque 500.
 
         Cheap on purpose: it asks whether the module can be FOUND, and never
         loads the model. An injected embedder answers yes without any import
@@ -357,12 +360,17 @@ class SpiywebIndex:
 
         `profile` names one of `precise` / `explore` / `compare`; it overlays
         exactly damping, threshold and seed width onto the base config and
-        leaves everything else alone. `exclude` carries "without X" phrases -
+        leaves everything else alone. Left as `None` with no config supplied
+        here or at `open()`, the library picks `DEFAULT_PROFILE` - the bare
+        `RetrievalConfig()` cannot spread past five seeds, and a silent top-k
+        is the one thing this class must never hand back. A config you DID
+        supply is never overlaid; `retrieve()` warns if it cannot spread.
+        The answer reports which profile ran. `exclude` carries "without X" phrases -
         each becomes an energy-ABSORBING negative seed rather than a filter,
         because a filter cannot remove a passage that arrived only by being
         X's neighbour.
         """
-        cfg = self._resolve(config, profile)
+        cfg, ran = self._resolve(config, profile)
         embedder = self._require_embedder()
         vector = embedder.embed_queries([query])[0]
         negatives = embedder.embed_queries(list(exclude)) if exclude else None
@@ -390,11 +398,13 @@ class SpiywebIndex:
             trace=self._record(
                 result,
                 query=query,
-                profile=profile,
+                profile=ran,
                 elapsed_ms=elapsed_ms,
                 settings=_settings(cfg),
                 propagation=cfg.propagation,
             ),
+            profile=ran,
+            config=cfg,
         )
 
     def retrieve_colored(
@@ -410,6 +420,11 @@ class SpiywebIndex:
         colour label to that part's text, and insertion order matters: the
         FIRST part is the primary one, and only its failure to touch the index
         is an error.
+
+        No default profile here, unlike `retrieve()`: `ColoredRetrievalConfig()`
+        is the measured operating point and clears the spread bar on every
+        colour, so there is no trap to step around, and overlaying `explore`
+        would move a measured width (2 per colour) for nothing.
         """
         base = config if config is not None else ColoredRetrievalConfig()
         if profile is not None:
@@ -448,36 +463,8 @@ class SpiywebIndex:
             ),
         )
 
-    def inspect_url(self, **options: object) -> str:
-        """Start the browser viewer on this index and return its link (D38).
-
-        Two lines in somebody's own application: open the index, print this.
-        The server is loopback-only, on a port the OS picks, behind a token
-        in the URL - see `spiyweb.viewer.security` for why each of the three
-        is not negotiable. It runs on a daemon thread, so it never takes the
-        calling process over, and calling this twice returns the SAME link
-        rather than starting a second server on a second port.
-
-        Needs the browser face: `pip install "spiyweb[web]"`.
-        """
-        # Under the lock: two threads calling this at once would otherwise
-        # both see `None`, both start a server, and one handle would be
-        # dropped on the floor - a listening socket nobody can close, in the
-        # caller's process, for the life of the process.
-        with self._viewer_lock:
-            if self._viewer is not None and self._viewer.running:
-                return self._viewer.url
-            from spiyweb.viewer import serve_index
-
-            self._viewer = serve_index(self, **options)  # type: ignore[arg-type]
-            return self._viewer.url
-
     def close(self) -> None:
         """Drop the loaded artifacts. The object is not usable afterwards."""
-        with self._viewer_lock:
-            if self._viewer is not None:
-                self._viewer.stop()
-                self._viewer = None
         self._texts = {}
         self._negative = None
 
@@ -521,9 +508,20 @@ class SpiywebIndex:
 
     def _resolve(
         self, config: RetrievalConfig | None, profile: str | None
-    ) -> RetrievalConfig:
+    ) -> tuple[RetrievalConfig, str]:
+        """The config this call runs with, and the name of the profile in it.
+
+        The default profile applies only when the caller expressed no
+        preference at all - no profile here, no config here, none at
+        `open()`. A config the caller built is theirs as built.
+        """
         base = config if config is not None else self._config
-        return self._profile(profile).as_retrieval(base) if profile else base
+        if profile is None and base is None:
+            profile = DEFAULT_PROFILE
+        base = base if base is not None else RetrievalConfig()
+        if profile:
+            return self._profile(profile).as_retrieval(base), profile
+        return base, ""
 
     @staticmethod
     def _profile(name: str | None) -> Profile:
@@ -599,7 +597,7 @@ def _settings(
     """The knobs this call ran with, flattened for the record.
 
     A trace whose settings are missing cannot be compared with another one,
-    and comparing two runs is most of what a viewer is for.
+    and comparing two runs is most of what a trace reader is for.
     """
     propagation = config.propagation
     return {

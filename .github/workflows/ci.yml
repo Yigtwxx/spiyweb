@@ -27,11 +27,9 @@ jobs:
       - name: Sync environment
         # `store` is non-negotiable in CI: FAISS itself is the unit under
         # test, there is nothing to fake. `entity` buys the real spaCy import
-        # path cheaply (no model download). `web` carries pydantic, which
-        # `server/schemas.py` imports, so the server tests collect at all.
-        # `embed` (torch) stays out: every line of its glue is covered by
-        # fake-encoder tests.
-        run: uv sync --group dev --extra store --extra entity --extra web
+        # path cheaply (no model download). `embed` (torch) stays out: every
+        # line of its glue is covered by fake-encoder tests.
+        run: uv sync --group dev --extra store --extra entity --extra view
 
       - name: Lint
         run: uv run ruff check .
@@ -42,45 +40,11 @@ jobs:
       - name: Test
         run: uv run pytest
 
-  web:
-    # The browser face is TypeScript, and until Faz 2.5 nothing here compiled
-    # it: a type error or a broken build reached main freely because Python
-    # CI cannot see it. It ships inside the wheel now, so a bundle that does
-    # not build is a wheel that does not work.
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install exactly the lockfile
-        run: npm ci
-        working-directory: web
-
-      - name: Lint
-        run: npm run lint
-        working-directory: web
-
-      - name: Build - `tsc -b` first, so a type error fails here
-        run: npm run build
-        working-directory: web
-
-      - name: The bundle landed inside the package
-        # `vite.config.ts` builds into `src/spiyweb/viewer/static`, not into
-        # `web/dist`. If that ever silently reverts, the wheel job below
-        # would quietly ship a viewer with no page in it.
-        run: test -f src/spiyweb/viewer/static/index.html
-
   wheel:
     # The zero-dependency rule is a PACKAGING claim, and the `check` job
-    # structurally cannot test it: `uv sync --extra store --extra entity
-    # --extra web` puts numpy, faiss and pydantic on the path, so
-    # `import spiyweb` succeeds there whatever the wheel contains. This job is
+    # structurally cannot test it: `uv sync --extra store --extra entity`
+    # puts numpy and faiss on the path, so `import spiyweb` succeeds there
+    # whatever the wheel contains. This job is
     # the only place the claim is measured, and the only place `py.typed`, the
     # single version source and the canonical trace are checked on the
     # ARTIFACT rather than on the checkout.
@@ -99,43 +63,12 @@ jobs:
         with:
           enable-cache: true
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Build the browser bundle into the package
-        # Before the wheel, deliberately: `artifacts` in pyproject.toml packs
-        # `src/spiyweb/viewer/static` if it exists and shrugs if it does not,
-        # so building afterwards would produce a wheel whose `inspect_url()`
-        # has no page to serve - and nothing downstream would notice.
-        run: npm ci && npm run build
-        working-directory: web
-
       - name: Build BOTH artifacts, the way a release does
         # `uv build` and not `uv build --wheel`: the two-target build makes
         # the sdist first and then builds the wheel FROM it, which is the
         # path a release takes and the only one that catches a file the
-        # sdist forgot. On 2026-08-26 it produced a 229 KB wheel with no
-        # browser bundle while `--wheel` produced the right 1.4 MB one.
+        # sdist forgot.
         run: uv build
-
-      - name: Both artifacts carry the browser bundle
-        run: |
-          python - <<'PY'
-          import glob, tarfile, zipfile
-
-          names = zipfile.ZipFile(sorted(glob.glob("dist/*.whl"))[-1]).namelist()
-          packed = [n for n in names if n.startswith("spiyweb/viewer/static/")]
-          assert "spiyweb/viewer/static/index.html" in names, "no bundle in the wheel"
-
-          sdist = tarfile.open(sorted(glob.glob("dist/*.tar.gz"))[-1]).getnames()
-          in_sdist = [n for n in sdist if "viewer/static" in n]
-          assert in_sdist, "no bundle in the sdist - a release wheel built from it would have none"
-
-          print(f"bundle ok: {len(packed)} in the wheel, {len(in_sdist)} in the sdist")
-          PY
 
       - name: The artifacts are fit to upload
         run: uvx twine check dist/*
@@ -152,7 +85,7 @@ jobs:
         # guarding the moment a line is added after it.
         run: |
           uv pip list --python .wheelenv/bin/python
-          for mod in numpy faiss torch spacy transformers fastapi pydantic; do
+          for mod in numpy faiss torch spacy transformers; do
             if .wheelenv/bin/python -c "import $mod" 2>/dev/null; then
               echo "::error::$mod installed - the wheel is not dependency-free"
               exit 1

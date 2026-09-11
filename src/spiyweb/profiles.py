@@ -137,3 +137,20 @@ PROFILES: dict[str, Profile] = {
     profile.name: profile for profile in (PRECISE, EXPLORE, COMPARE)
 }
 """Name -> profile map for UI selectors and config files."""
+
+DEFAULT_PROFILE = EXPLORE.name
+"""The profile that runs when a caller names none and supplies no config -
+in `SpiywebIndex.retrieve()`, `ThermalSession`, the terminal and the viewer
+alike. The reason is arithmetic rather than taste.
+
+`RetrievalConfig()` splits 10.0 energy among 5 seeds and stops at 15% of it,
+so the strongest seed forwards at most 1.23 against a threshold of 1.50 -
+nothing can ever clear it and the web returns first contact only. That is
+`top-k` with extra steps, which is the one thing this project exists to not
+be, and it is what a first-time caller would have seen.
+
+`RetrievalConfig()` itself stays where CLAUDE.md §2.1 put it: it carries the
+canonical worked example, and no measured number may move. So the default is
+applied one level up, where a person first meets the mechanism, and only
+when that person has expressed no preference at all: an explicit config is
+never overlaid, and the spread warning in `retrieve()` keeps guarding it."""

@@ -1,0 +1,18 @@
+# Every text file is stored with LF, whatever the contributor's platform
+# does on checkout. The tree has been 100% LF since the first commit; this
+# only stops a Windows clone without `core.autocrlf` from committing CRLF
+# and failing `ruff format --check` on the Linux and macOS CI legs.
+* text=auto eol=lf
+
+# Binary artifacts are never normalised.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.npz binary
+*.npy binary
+*.faiss binary
+*.pdf binary

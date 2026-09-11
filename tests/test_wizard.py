@@ -161,20 +161,9 @@ def test_an_index_nearby_is_found(
     (index / "nodes.json").write_text(json.dumps([1, 2, 3]), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
-    indexes, _ = discover()
+    indexes = discover()
     assert [found.path.name for found in indexes] == ["my-index"]
     assert indexes[0].detail == "3 atoms"
-
-
-def test_a_trace_file_nearby_is_found(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    store = tmp_path / "recorded"
-    store.mkdir()
-    (store / "traces.jsonl").write_text("", encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
-    _, traces = discover()
-    assert [found.path.name for found in traces] == ["traces.jsonl"]
 
 
 def test_a_directory_that_is_not_an_index_is_not_offered(
@@ -182,7 +171,7 @@ def test_a_directory_that_is_not_an_index_is_not_offered(
 ) -> None:
     (tmp_path / "not-an-index").mkdir()
     monkeypatch.chdir(tmp_path)
-    indexes, _ = discover()
+    indexes = discover()
     assert indexes == []
 
 
@@ -227,7 +216,7 @@ def test_the_menu_shows_what_it_ran(
 ) -> None:
     """So the second time you type it yourself and the menu is unnecessary."""
     monkeypatch.setattr("spiyweb.cli.main", lambda argv: 0)
-    answers.append("5")  # version
+    answers.append("4")  # version
     assert run_wizard() == 0
     assert "running: spiyweb version" in capsys.readouterr().out
 
@@ -375,3 +364,31 @@ def test_ctrl_c_is_raised_rather_than_classified() -> None:
 
     with pytest.raises(KeyboardInterrupt):
         _classify("\x03")
+
+
+@pytest.mark.parametrize(
+    ("bytes_after_escape", "expected"),
+    [
+        ("", "quit"),  # a bare ESC: nothing follows, and nothing may block
+        ("[A", "up"),
+        ("[B", "down"),
+        ("OA", "up"),  # application-mode arrows
+        ("OB", "down"),
+        ("[C", ""),  # right arrow: not an intent here
+        ("x", ""),  # alt+x, or noise
+    ],
+)
+def test_an_escape_sequence_is_decoded_without_blocking(
+    bytes_after_escape: str, expected: str
+) -> None:
+    """The POSIX reader once did `read(2)` after ESC and froze on a bare ESC."""
+    from spiyweb.wizard import _decode_escape
+
+    queue = list(bytes_after_escape)
+
+    def read(n: int) -> str:
+        assert queue, "read past the end - this is the blocking read"
+        return "".join(queue.pop(0) for _ in range(n))
+
+    assert _decode_escape(pending=lambda: bool(queue), read=read) == expected
+    assert not queue, "everything the terminal sent was consumed"

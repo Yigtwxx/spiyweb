@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 def test_every_verb_is_reachable() -> None:
     parser = build_parser()
-    for verb in ("version", "index", "query", "view"):
+    for verb in ("version", "index", "query", "lint"):
         assert parser.parse_args([verb, *_stub(verb)]).command == verb
 
 
@@ -41,7 +41,7 @@ def _stub(verb: str) -> list[str]:
         "version": [],
         "index": ["docs", "out"],
         "query": ["idx", "a question"],
-        "view": ["idx"],
+        "lint": ["idx"],
     }[verb]
 
 
@@ -182,6 +182,27 @@ def test_a_directory_of_text_becomes_documents(tmp_path: Path) -> None:
     assert documents[1].units[0].text == "first block"
 
 
+def test_corpus_discovery_ignores_case_and_orders_by_source_id(
+    tmp_path: Path,
+) -> None:
+    """`README.TXT` was indexed on Windows and skipped on macOS and Linux.
+
+    Order is by the posix relative path - the source id - on every
+    platform, so `nodes.json` from two machines is byte-identical.
+    """
+    from spiyweb.cli import _read_documents
+
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "Upper.TXT").write_text("shouted", "utf-8")
+    (tmp_path / "lower.md").write_text("whispered", "utf-8")
+    (tmp_path / "nested" / "z.Markdown").write_text("deep", "utf-8")
+
+    documents = _read_documents(tmp_path, None, whole=True)
+    ids = [document.source_id for document in documents]
+    assert ids == ["Upper.TXT", "lower.md", "nested/z.Markdown"]
+    assert ids == sorted(ids), "byte order of the posix path, not the OS's"
+
+
 def test_whole_file_keeps_a_document_in_one_piece(tmp_path: Path) -> None:
     from spiyweb.cli import _read_documents
 
@@ -202,74 +223,6 @@ def test_a_missing_corpus_directory_is_named(tmp_path: Path) -> None:
 
     with pytest.raises(Problem, match="is not a directory"):
         _read_documents(tmp_path / "absent", None, whole=False)
-
-
-# --- view ------------------------------------------------------------------
-
-
-def test_view_tells_an_index_from_a_trace_file(
-    tiny_index_root: Path, tmp_path: Path
-) -> None:
-    from spiyweb.cli import _is_index, _traces_at
-
-    assert _is_index(tiny_index_root)
-    assert _traces_at(tiny_index_root) is None
-
-    (tmp_path / "traces.jsonl").write_text("", "utf-8")
-    assert not _is_index(tmp_path)
-    assert _traces_at(tmp_path) == tmp_path / "traces.jsonl"
-
-
-def test_view_refuses_something_that_is_neither(tmp_path: Path) -> None:
-    with pytest.raises(Problem, match="neither an index directory"):
-        main(["view", str(tmp_path), "--no-browser"])
-
-
-def test_view_flushes_its_link_before_it_blocks(tiny_index_root: Path) -> None:
-    """The bug this pins was real: piped, the link never arrived.
-
-    `view` prints the URL and then blocks on a server. Python block-buffers
-    stdout whenever it is not a terminal, so anything reading this command
-    through a pipe - a script, a notebook, a log - saw an empty stream and
-    concluded it had hung. It had not hung; nobody could hear it.
-    """
-    import re
-    import subprocess
-    import sys
-
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "spiyweb.cli",
-            "view",
-            str(tiny_index_root),
-            "--no-browser",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        bufsize=1,
-    )
-    try:
-        url = None
-        assert proc.stdout is not None
-        for _ in range(10):
-            line = proc.stdout.readline()
-            if not line:
-                break
-            found = re.search(r"http://127\.0\.0\.1:\d+/\?token=\S+", line)
-            if found:
-                url = found.group(0)
-                break
-        assert url, "the viewer's link never reached a piped stdout"
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=15)
-        except subprocess.TimeoutExpired:  # pragma: no cover - a wedged child
-            proc.kill()
 
 
 # --- lint ------------------------------------------------------------------

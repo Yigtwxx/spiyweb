@@ -32,15 +32,7 @@ change that moves a measured retrieval number is never silent.
 ```bash
 ruff check . && ruff format --check .
 pytest
-(cd web && npm ci && npm run lint && npm run build)
 ```
-
-The front-end build is not optional. `vite.config.ts` writes into
-`src/spiyweb/viewer/static`, and `pyproject.toml` packs that directory through
-`artifacts` — pack it BEFORE building the wheel or `inspect_url()` ships with
-no page to serve. `spiyweb version` on the installed wheel is not enough to
-notice; `tests/wheel_smoke.py` prints `with the browser bundle` or
-`WITHOUT a bundle`, and that line is the check.
 
 ## Build and verify the artifact
 
@@ -48,12 +40,11 @@ Build **both** targets with a bare `uv build`, never `uv build --wheel`.
 
 That is not a style preference. `uv build` makes the sdist first and then
 builds the wheel **from that sdist**, which is the path a release takes. On
-2026-08-26 the two commands produced different wheels: `--wheel` gave the
-right 1.4 MB artifact, and `uv build` gave a 229 KB one **with no browser
-bundle in it**, because the bundle is gitignored and was named only under the
-wheel target. `inspect_url()` would have shipped permanently broken. The
-`artifacts` key now sits under `[tool.hatch.build]`, which covers both, and
-CI builds the release way so the two can never disagree again.
+2026-08-26 the two commands produced different wheels, because a gitignored
+file (the browser bundle of the time) was named only under the wheel target
+and the sdist-built wheel lost it. Anything a future release needs to pack
+that git does not track goes under `[tool.hatch.build]`, which covers both
+targets, and CI builds the release way so the two can never disagree.
 
 ```bash
 rm -rf dist && uv build
@@ -65,12 +56,12 @@ uv pip install --python .relenv/bin/python dist/*.whl
 .relenv/bin/spiyweb version
 ```
 
-Four things have to be true, and the smoke script asserts three of them:
+Four things have to be true, and the smoke script asserts them:
 `py.typed` shipped, the metadata version matches `__version__`, no optional
 dependency reached the import graph, and the canonical trace of CLAUDE.md §2.6
-still ranks `D` third. The fourth is the line about the bundle.
+still ranks `D` third.
 
-`spiyweb version` is the fourth check by hand: it proves the console script
+`spiyweb version` is the check by hand: it proves the console script
 was registered, and on an extras-free install every row should read
 `not installed` — which is the correct answer, not a failure.
 
