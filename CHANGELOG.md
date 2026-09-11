@@ -27,6 +27,10 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.1] - 2026-09-11
+
 ### Changed
 
 - `/find` prints one row per file (import count, first line) instead of
