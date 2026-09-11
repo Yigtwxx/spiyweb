@@ -44,3 +44,6 @@ runs/
 
 .modelenv/
 .modelrun/
+
+# Built by examples/hello_web.py wherever it is run
+hello-index/
