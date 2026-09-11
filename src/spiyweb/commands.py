@@ -152,7 +152,11 @@ def find_usages(
     for current, dirs, files in os.walk(root):
         depth = len(Path(current).relative_to(root).parts)
         dirs[:] = sorted(
-            d for d in dirs if not d.startswith(".") and d not in PRUNED_DIRS
+            d
+            for d in dirs
+            if not d.startswith(".")
+            and d not in PRUNED_DIRS
+            and not _is_spiyweb_itself(Path(current) / d)
         )
         if depth >= max_depth:
             dirs[:] = []
@@ -187,6 +191,14 @@ def find_usages(
     )
 
 
+def _is_spiyweb_itself(directory: Path) -> bool:
+    """The library's own package imports itself on every line; a checkout of
+    spiyweb is not an application that uses it."""
+    return (
+        directory.name == "spiyweb" and (directory / "core" / "propagate.py").is_file()
+    )
+
+
 def _find(monitor: Monitor, _: Invocation) -> None:
     cfg = monitor.config
     report = find_usages(
@@ -204,15 +216,20 @@ def _find(monitor: Monitor, _: Invocation) -> None:
         )
         return
     lines: list[str] = []
+    by_file: dict[Path, list[Usage]] = {}
     for usage in report.usages:
+        by_file.setdefault(usage.path, []).append(usage)
+    for path, usages in by_file.items():
         try:
-            shown = usage.path.relative_to(monitor.cwd.resolve())
+            shown = path.relative_to(monitor.cwd.resolve())
         except ValueError:
-            shown = usage.path
+            shown = path
+        first = usages[0]
+        count = f"{len(usages)} imports" if len(usages) > 1 else "1 import"
         lines.append(
-            monitor.paint(f"{shown}:{usage.line}", "accent")
+            monitor.paint(str(shown), "accent")
             + "   "
-            + monitor.paint(usage.text, "muted")
+            + monitor.paint(f"{count}, first at line {first.line}", "muted")
         )
     for hint in report.index_hints:
         resolved = _resolve_hint(monitor, hint)

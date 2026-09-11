@@ -27,7 +27,11 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- `/find` prints one row per file (import count, first line) instead of
+  one per import, and skips spiyweb's own package tree when run inside a
+  checkout of it.
 
 ## [0.2.0] - 2026-09-11
 

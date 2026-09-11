@@ -96,6 +96,10 @@ def test_find_lists_imports_and_suggests_the_opened_index(tmp_path: Path) -> Non
     _write(tmp_path / ".venv" / "lib" / "x.py", "import spiyweb\n")
     _write(tmp_path / "node_modules" / "y.py", "import spiyweb\n")
     _write(tmp_path / "a/b/c/d/e/f/g/deep.py", "import spiyweb\n")
+    _write(
+        tmp_path / "vendor" / "spiyweb" / "__init__.py", "from spiyweb.core import x\n"
+    )
+    _write(tmp_path / "vendor" / "spiyweb" / "core" / "propagate.py", "")
     (tmp_path / "my-index").mkdir()
     (tmp_path / "my-index" / "nodes.json").write_text("[]", encoding="utf-8")
 
@@ -106,7 +110,8 @@ def test_find_lists_imports_and_suggests_the_opened_index(tmp_path: Path) -> Non
     monitor = quiet_monitor(tmp_path)
     dispatch(monitor, "/find")
     shown = transcript(monitor)
-    assert "main.py:2" in shown
+    assert "main.py" in shown and "1 import, first at line 2" in shown
+    assert "main.py:2" not in shown, "one row per file, not per line"
     assert monitor.suggested_index is not None
     assert monitor.suggested_index.endswith("my-index")
     assert "elsewhere" in shown and "not found" in shown
