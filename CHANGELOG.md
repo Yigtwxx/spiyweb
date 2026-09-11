@@ -91,6 +91,10 @@ regression suite, and its CLI flags are not covered by the policy above.
   glyphs, colour - saved to `.spiyweb/monitor.json`), `/clear`, `/menu`,
   `/version`. Text without a slash is a question for the current index.
   A CLI error that says `pip install "spiyweb[x]"` says `/install x` here.
+- `! <command>` runs a shell command from the monitor, in the background,
+  its output streaming into the transcript - the way to start the project
+  from the same window and watch it; `/jobs` lists them, `/kill [n]` stops
+  one, and every job ends with the monitor. The child gets no stdin.
 - `TraceConfig.attach_dir` / `attach_stale_s`, `spiyweb.config.WatchConfig`
   (the monitor's knobs; not in `spiyweb.__all__`), `spiyweb.trace.WATCH_MARKER`,
   `attached_trace_path`, `ensure_private_dir`.

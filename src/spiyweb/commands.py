@@ -126,6 +126,10 @@ def _help(monitor: Monitor, _: Invocation) -> None:
             + monitor.paint(command.summary, "muted")
         )
     lines.append(
+        monitor.paint("! <command>".ljust(30), "accent")
+        + monitor.paint("run a shell command here, in the background", "muted")
+    )
+    lines.append(
         monitor.paint("anything else".ljust(30), "accent")
         + monitor.paint("a question for the current index", "muted")
     )
@@ -573,6 +577,50 @@ def _version(monitor: Monitor, _: Invocation) -> None:
     monitor.run_captured(["version"])
 
 
+def _jobs(monitor: Monitor, _: Invocation) -> None:
+    if not monitor.jobs:
+        monitor.reply(
+            monitor.paint("no jobs - `! python app.py` starts one", "muted"),
+            tone="muted",
+        )
+        return
+    lines = []
+    for job in monitor.jobs:
+        code = job.process.poll()
+        state = (
+            monitor.paint("running", "good")
+            if code is None
+            else monitor.paint(f"exit {code}", "muted")
+        )
+        lines.append(
+            monitor.paint(f"{job.number}", "accent")
+            + "  "
+            + state
+            + "  "
+            + monitor.paint(job.command, "muted")
+        )
+    monitor.reply(*lines)
+
+
+def _kill(monitor: Monitor, invocation: Invocation) -> None:
+    running = [job for job in monitor.jobs if job.process.poll() is None]
+    if not running:
+        monitor.reply(monitor.paint("nothing is running", "muted"), tone="muted")
+        return
+    target = running[-1]
+    if invocation.args and invocation.args[0].isdigit():
+        wanted = int(invocation.args[0])
+        matches = [job for job in running if job.number == wanted]
+        if not matches:
+            monitor.reply(
+                monitor.paint(f"no running job {wanted}", "warn"), tone="warn"
+            )
+            return
+        target = matches[0]
+    target.stop()
+    monitor.reply(monitor.paint(f"job {target.number} stopped", "warn"), tone="warn")
+
+
 def _quit(monitor: Monitor, _: Invocation) -> None:
     monitor.reply(
         monitor.paint(
@@ -605,6 +653,8 @@ COMMANDS: tuple[Command, ...] = (
         "config", "/config", "profile, map, spider, speed - with arrow keys", _config
     ),
     Command("clear", "/clear", "wipe the transcript", _clear),
+    Command("jobs", "/jobs", "shell commands started with !", _jobs),
+    Command("kill", "/kill [n]", "stop a running job (the last by default)", _kill),
     Command("menu", "/menu", "the old numbered menu", _menu),
     Command("version", "/version", "version and extras", _version),
     Command("quit", "/quit", "(close the terminal instead)", _quit),

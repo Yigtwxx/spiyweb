@@ -27,7 +27,10 @@ from __future__ import annotations
 import io
 import json
 import os
+import queue
+import subprocess
 import sys
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field, replace
@@ -76,7 +79,7 @@ from spiyweb.trace import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-__all__ = ["Marker", "Monitor", "TraceTail", "interactive", "run_monitor"]
+__all__ = ["Job", "Marker", "Monitor", "TraceTail", "interactive", "run_monitor"]
 
 SETTINGS_FILENAME = "monitor.json"
 """Where `/config` choices persist, next to the marker."""
@@ -92,6 +95,10 @@ MAP_MIN_ROWS = 7
 
 DOUBLE_INTERRUPT_S = 1.0
 """Two ctrl-c inside this window leave; one clears the prompt."""
+
+JOB_LINES_PER_TICK = 20
+"""How much of a job's output one tick may log; the rest waits its turn."""
+
 
 PROFILES = ("explore", "precise", "compare")
 HOP_DELAYS = (0, 300, 650, 1000)
@@ -227,6 +234,71 @@ class Prompt:
 
 
 @dataclass
+class Job:
+    """A shell command started with `!`, running beside the monitor.
+
+    Its output arrives through a queue fed by a reader thread and is logged
+    a few lines per tick, so a chatty server never stalls the screen. The
+    child gets no stdin: the keyboard belongs to the monitor.
+    """
+
+    number: int
+    command: str
+    process: subprocess.Popen[str]
+    lines: queue.Queue[str | None] = field(default_factory=queue.Queue)
+    done: bool = False
+    exit_code: int | None = None
+
+    @classmethod
+    def start(cls, number: int, command: str, cwd: Path) -> Job:
+        process = subprocess.Popen(
+            command,
+            shell=True,
+            cwd=str(cwd),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+        )
+        job = cls(number=number, command=command, process=process)
+
+        def pump() -> None:
+            assert process.stdout is not None
+            for line in process.stdout:
+                job.lines.put(line.rstrip("\r\n"))
+            job.lines.put(None)
+
+        threading.Thread(target=pump, daemon=True).start()
+        return job
+
+    def drain(self, limit: int) -> tuple[list[str], bool]:
+        """Up to `limit` waiting lines, and whether the process has ended."""
+        out: list[str] = []
+        while len(out) < limit:
+            try:
+                item = self.lines.get_nowait()
+            except queue.Empty:
+                break
+            if item is None:
+                self.done = True
+                self.exit_code = self.process.wait()
+                break
+            out.append(item)
+        return out, self.done
+
+    def stop(self) -> None:
+        if self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+
+
+@dataclass
 class Settings:
     """What `/config` can change; persisted as JSON next to the marker."""
 
@@ -313,6 +385,7 @@ class Monitor:
         self.last_interrupt = -1e9
         self.suggested_index: str | None = None
         self.indexes: dict[str, object] = {}
+        self.jobs: list[Job] = []
         self.running = True
         self.dirty = True
         self.drawn: list[str] = []
@@ -472,7 +545,7 @@ class Monitor:
             body = self.buffer + caret
         else:
             body = caret + self.paint(
-                "type a command - / lists them, ? for shortcuts", "dim"
+                "type a command - / lists them, ! runs a shell command", "dim"
             )
         return self.boxed([self.paint(g.prompt, "accent", "bold") + " " + body], width)
 
@@ -851,9 +924,54 @@ class Monitor:
             return
         self.history.append(line)
         self.history_at = len(self.history)
+        if line.startswith("!"):
+            self.start_job(line[1:].strip())
+            return
         from spiyweb.commands import dispatch
 
         dispatch(self, line)
+
+    def start_job(self, command: str) -> None:
+        """`! python app.py`: run it here, in the background, watching."""
+        self.echo("! " + command)
+        if not command:
+            self.reply(self.paint("nothing to run after the !", "warn"), tone="warn")
+            return
+        try:
+            job = Job.start(len(self.jobs) + 1, command, self.cwd)
+        except OSError as failure:
+            self.reply(self.paint(str(failure), "warn"), tone="warn")
+            return
+        self.jobs.append(job)
+        self.reply(
+            self.paint(f"job {job.number} started", "good")
+            + self.paint(f"  pid {job.process.pid} - /jobs lists, /kill stops", "dim")
+        )
+
+    def pump_jobs(self) -> None:
+        for job in self.jobs:
+            if job.done:
+                continue
+            lines, ended = job.drain(JOB_LINES_PER_TICK)
+            for line in lines:
+                self.log(
+                    self.paint(f"  {self.glyphs.v} ", "dim")
+                    + self.paint(f"{job.number} ", "muted")
+                    + line
+                )
+            if ended:
+                tone = "good" if job.exit_code == 0 else "warn"
+                self.reply(
+                    self.paint(f"job {job.number} ended", tone)
+                    + self.paint(f"  exit {job.exit_code}", "dim"),
+                    tone=tone,
+                )
+            if lines or ended:
+                self.dirty = True
+
+    def stop_jobs(self) -> None:
+        for job in self.jobs:
+            job.stop()
 
     # --- the loop ----------------------------------------------------------
 
@@ -864,6 +982,7 @@ class Monitor:
         for record in self.tail.poll():
             self.last_record_at = now
             self.play(record)
+        self.pump_jobs()
         self._advance(now)
         if self.playing is not None or self.tick_count % 12 == 0:
             self.dirty = True
@@ -911,6 +1030,7 @@ class Monitor:
             out(DISABLE_FOCUS + SHOW_CURSOR + "\n")
             raise failure
         finally:
+            self.stop_jobs()
             self.marker.stop()
             out(DISABLE_FOCUS + SHOW_CURSOR + "\n")
             self.flush()

@@ -440,3 +440,51 @@ def test_the_caret_follows_the_terminal_focus(tmp_path: Path) -> None:
     monitor.handle_key("focus_in", 0.0)
     assert any("▏" in line for line in monitor.input_box(80, True))
     assert monitor.buffer == "", "focus reports never type"
+
+
+def test_a_bang_runs_a_shell_command_and_streams_its_output(tmp_path: Path) -> None:
+    import sys
+
+    command = f'{sys.executable} -c "print(1 + 1); print(3)"'
+    driver = Driver([*("!" + command), "enter", *([None] * 40)], tick_s=0.05)
+    monitor, _ = make_monitor(tmp_path, driver)
+    real_poll = driver.poll
+
+    def slow_poll(timeout: float) -> str | None:
+        import time as _time
+
+        _time.sleep(0.05)
+        return real_poll(timeout)
+
+    monitor.poll = slow_poll
+    monitor.run()
+    joined = "\n".join(monitor.transcript)
+    assert "job 1 started" in joined
+    assert " 2" in joined and " 3" in joined, joined
+    assert "job 1 ended" in joined and "exit 0" in joined
+    assert monitor.jobs[0].done
+
+
+def test_jobs_and_kill_manage_what_bang_started(tmp_path: Path) -> None:
+    import sys
+
+    driver = Driver([None])
+    monitor, _ = make_monitor(tmp_path, driver)
+    monitor.start_job(f'{sys.executable} -c "import time; time.sleep(30)"')
+    from spiyweb.commands import dispatch
+
+    dispatch(monitor, "/jobs")
+    assert "running" in "\n".join(monitor.transcript)
+    dispatch(monitor, "/kill 1")
+    assert monitor.jobs[0].process.poll() is not None
+    assert "job 1 stopped" in "\n".join(monitor.transcript)
+    dispatch(monitor, "/kill")
+    assert "nothing is running" in "\n".join(monitor.transcript)
+
+
+def test_an_empty_bang_is_refused(tmp_path: Path) -> None:
+    driver = Driver([None])
+    monitor, _ = make_monitor(tmp_path, driver)
+    monitor.start_job("")
+    assert "nothing to run" in "\n".join(monitor.transcript)
+    assert monitor.jobs == []
