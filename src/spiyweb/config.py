@@ -979,6 +979,17 @@ class CorpusLintConfig:
             raise ValueError("max_nodes_per_finding must be at least 1")
 
 
+ATTACH_DIR = ".spiyweb"
+"""Where a running `spiyweb` monitor leaves its marker and where an
+application's records are appended while that marker is fresh. Relative to
+the process's working directory: the monitor is opened in the project folder,
+and the application runs from the same folder."""
+
+ATTACH_STALE_S = 10.0
+"""A marker older than this many seconds belongs to a monitor that crashed or
+was closed. The library stops writing on its own; nothing has to clean up."""
+
+
 @dataclass(frozen=True)
 class TraceConfig:
     """Settings of the query trace layer (D38) - what an application recorded.
@@ -1009,6 +1020,15 @@ class TraceConfig:
         max_edges: Overflow guard on the recorded edge count, strongest
             first. `0` means no limit. A record that hit the guard says so
             (`edges_truncated`) rather than quietly showing a thinner web.
+        attach_dir: The one exception to "disk on request": while somebody
+            runs the `spiyweb` monitor in this folder, its fresh marker file
+            under this directory is the request, and records are appended
+            to `<attach_dir>/traces.jsonl` so the monitor can play them.
+            Passage text lands there, in a folder that ignores itself from
+            git. `None` switches the mechanism off - the production setting.
+            Ignored when `directory` is set.
+        attach_stale_s: How old the marker may be and still count as a
+            listening monitor. One `stat` per query, never cached.
     """
 
     enabled: bool = True
@@ -1018,6 +1038,8 @@ class TraceConfig:
     text_chars: int = 0
     include_edges: bool = True
     max_edges: int = 4000
+    attach_dir: str | Path | None = ATTACH_DIR
+    attach_stale_s: float = ATTACH_STALE_S
 
     def __post_init__(self) -> None:
         if self.capacity < 1:
@@ -1026,6 +1048,77 @@ class TraceConfig:
             raise ValueError("text_chars must not be negative")
         if self.max_edges < 0:
             raise ValueError("max_edges must not be negative")
+        if self.attach_stale_s <= 0:
+            raise ValueError("attach_stale_s must be positive")
+
+
+@dataclass(frozen=True)
+class WatchConfig:
+    """Settings of the terminal monitor - bare `spiyweb`.
+
+    Not part of the query contract and not in `spiyweb.__all__`: the monitor
+    is an interface over the trace layer, and these are its knobs.
+
+    Attributes:
+        attach_dir: The folder the marker and the traces live in; must agree
+            with `TraceConfig.attach_dir` of the application being watched.
+        stale_s: Reported marker age past which an application would stop
+            writing - the library's own limit is `TraceConfig.attach_stale_s`.
+        heartbeat_s: How often the marker is touched. Must beat `stale_s`
+            with room to spare.
+        poll_ms: How often the trace file and the keyboard are checked.
+        hop_delay_ms: Time spent revealing one hop of a record. `0` plays
+            the last frame only.
+        hold_ms: Pause on a finished hop before the next one starts.
+        map_enabled: Whether the ring map is drawn beside the ranking.
+        map_min_width: Below this many columns the map is dropped.
+        map_rows: Height of the ring map.
+        ranking_width: Columns reserved for the ranking beside the map.
+        label_chars: Atom ids on the map and in the ranking are cut here.
+        max_rows: Ranking rows shown before "+n more".
+        bar_width: Width of the energy bars.
+        pet_enabled: Whether the spider sits in the welcome box.
+        sleep_after_s: Without a record for this long the status reads
+            "no app attached", the marker notwithstanding.
+        find_max_depth: How deep `/find` walks below the working directory.
+        find_max_files: How many files `/find` reads before it stops.
+        find_max_file_bytes: Files larger than this are skipped by `/find`.
+    """
+
+    attach_dir: str | Path = ATTACH_DIR
+    stale_s: float = ATTACH_STALE_S
+    heartbeat_s: float = 2.0
+    poll_ms: int = 40
+    hop_delay_ms: int = 650
+    hold_ms: int = 350
+    map_enabled: bool = True
+    map_min_width: int = 72
+    map_rows: int = 15
+    ranking_width: int = 72
+    label_chars: int = 12
+    max_rows: int = 12
+    bar_width: int = 22
+    pet_enabled: bool = True
+    sleep_after_s: float = 60.0
+    find_max_depth: int = 6
+    find_max_files: int = 5000
+    find_max_file_bytes: int = 1_000_000
+
+    def __post_init__(self) -> None:
+        if self.stale_s <= 0 or self.heartbeat_s <= 0:
+            raise ValueError("stale_s and heartbeat_s must be positive")
+        if self.heartbeat_s * 2 > self.stale_s:
+            raise ValueError("heartbeat_s must be at most half of stale_s")
+        if self.poll_ms < 1:
+            raise ValueError("poll_ms must be at least 1")
+        if self.hop_delay_ms < 0 or self.hold_ms < 0:
+            raise ValueError("hop_delay_ms and hold_ms must not be negative")
+        if self.map_rows < 5:
+            raise ValueError("map_rows must be at least 5")
+        if self.max_rows < 1 or self.bar_width < 1 or self.label_chars < 1:
+            raise ValueError("max_rows, bar_width and label_chars must be positive")
+        if self.find_max_depth < 0 or self.find_max_files < 1:
+            raise ValueError("find limits must be sensible")
 
 
 @dataclass(frozen=True)

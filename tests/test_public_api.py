@@ -24,7 +24,13 @@ from types import ModuleType
 import pytest
 
 import spiyweb
+import spiyweb.animate
+import spiyweb.commands
 import spiyweb.indexing
+import spiyweb.keys
+import spiyweb.pet
+import spiyweb.rings
+import spiyweb.watch
 
 PUBLIC_API = frozenset(
     {
@@ -297,7 +303,13 @@ for name in [n for n in sys.modules if n.split(".")[0] in BANNED]:
     del sys.modules[name]
 
 import spiyweb
+import spiyweb.animate
+import spiyweb.commands
 import spiyweb.indexing
+import spiyweb.keys
+import spiyweb.pet
+import spiyweb.rings
+import spiyweb.watch
 
 for attr in spiyweb.__all__:
     getattr(spiyweb, attr)

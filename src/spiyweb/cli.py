@@ -1,15 +1,18 @@
 """`spiyweb` on the command line: index a corpus, ask it, look at what it did.
 
-Four verbs, and every one of them wraps something the library already does
+Six verbs, and every one of them wraps something the library already does
 rather than adding a mechanism of its own. That constraint is the point: a
 CLI that grows behaviour the Python API does not have becomes a second
 product to keep correct, and this project has a measurement campaign's worth
 of evidence about what happens when one mechanism has two implementations.
 
+    spiyweb                               the live monitor (same as `watch`)
+    spiyweb watch                         watch this folder's app query, live
     spiyweb version                       what is installed, and what is not
     spiyweb index docs/ my-index          a directory of text files -> an index
     spiyweb query my-index "a question"   the activated web, as text
     spiyweb lint my-index                 what is wrong with the CORPUS
+    spiyweb menu                          the old numbered menu
 
 Importing this module costs nothing. `spiyweb version` has to work on a bare
 `pip install spiyweb` - that is precisely when somebody needs to be told which
@@ -554,7 +557,35 @@ def build_parser() -> argparse.ArgumentParser:
     lint.add_argument("--json", action="store_true", help="machine-readable")
     lint.set_defaults(handler=_lint)
 
+    watch = subs.add_parser(
+        "watch",
+        help="the live monitor: every query your app runs, played as it happens",
+    )
+    watch.add_argument(
+        "--dir",
+        default=None,
+        help="folder holding the marker and traces.jsonl (default .spiyweb)",
+    )
+    watch.set_defaults(handler=_watch)
+
+    menu = subs.add_parser("menu", help="the guided menu: questions, no monitor")
+    menu.set_defaults(handler=_menu)
+
     return parser
+
+
+def _watch(args: argparse.Namespace) -> int:
+    from spiyweb.config import WatchConfig
+    from spiyweb.watch import interactive
+
+    config = WatchConfig() if args.dir is None else WatchConfig(attach_dir=args.dir)
+    return interactive(config)
+
+
+def _menu(args: argparse.Namespace) -> int:
+    from spiyweb.wizard import interactive
+
+    return interactive()
 
 
 def _writable_stdout() -> None:
@@ -581,18 +612,19 @@ def _writable_stdout() -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point of the `spiyweb` command.
 
-    With no arguments this opens the guided menu - one word to type, then
-    questions - but only in a terminal. A pipe or a CI job gets the usage
-    text and a non-zero exit, because a prompt with nobody at it is a hung
-    build rather than a friendly one.
+    With no arguments this opens the live monitor - nothing is asked - but
+    only in a terminal. A pipe or a CI job gets the usage text and a
+    non-zero exit, because a prompt with nobody at it is a hung build rather
+    than a friendly one; a terminal that cannot read single keys or redraw
+    a screen gets the numbered menu instead.
     """
     _writable_stdout()
     args = build_parser().parse_args(argv)
-    if getattr(args, "command", None) is None:
-        from spiyweb.wizard import interactive
-
-        return interactive()
     try:
+        if getattr(args, "command", None) is None:
+            from spiyweb.watch import interactive
+
+            return interactive()
         return int(args.handler(args))
     except Problem:
         raise

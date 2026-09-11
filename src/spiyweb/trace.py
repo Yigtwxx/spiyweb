@@ -18,7 +18,10 @@ Two consequences, both deliberate:
 
 - **Memory by default, disk on request.** The store is a ring buffer of the
   last `capacity` calls. Passage text lands in the JSONL file, so writing one
-  is an explicit `TraceConfig(directory=...)` choice, never a default.
+  is an explicit `TraceConfig(directory=...)` choice, never a default. The
+  one other request the store honours is a running `spiyweb` monitor: its
+  fresh marker under `TraceConfig.attach_dir` makes the store append there
+  too, into a folder that ignores itself from git (`attach_dir=None` is off).
 - **No I/O and no heavy dependency to build a record.** Everything here is
   stdlib over `core` results, so `import spiyweb.trace` costs nothing and
   tracing never drags numpy into a caller's process that had avoided it.
@@ -27,6 +30,8 @@ Two consequences, both deliberate:
 from __future__ import annotations
 
 import json
+import os
+import time
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
@@ -50,6 +55,7 @@ if TYPE_CHECKING:
 __all__ = [
     "SCHEMA_VERSION",
     "TRACE_FILENAME",
+    "WATCH_MARKER",
     "TraceCluster",
     "TraceEdge",
     "TraceEvent",
@@ -58,7 +64,9 @@ __all__ = [
     "TracePath",
     "TraceRecord",
     "TraceStore",
+    "attached_trace_path",
     "build_trace",
+    "ensure_private_dir",
     "load_traces",
 ]
 
@@ -68,6 +76,53 @@ one. The viewer refuses a version it does not know rather than guessing."""
 
 TRACE_FILENAME = "traces.jsonl"
 """One append-only file per trace directory; a line is one complete record."""
+
+WATCH_MARKER = "watch"
+"""The file a running `spiyweb` monitor keeps touching inside the attach
+directory. Its mtime IS the heartbeat: fresh means somebody is watching."""
+
+GITIGNORE_ALL = "*\n"
+"""What the attach directory's own `.gitignore` says: passage text lands here,
+and a folder that ignores itself cannot be committed by accident."""
+
+
+def attached_trace_path(
+    directory: str | Path, *, stale_s: float, now: float | None = None
+) -> Path | None:
+    """Where a listening monitor wants records appended, or `None`.
+
+    One `stat`, no cache: a marker removed between two queries is seen by the
+    second one, and a monitor that crashed stops being obeyed `stale_s`
+    seconds later without anybody cleaning up.
+    """
+    if os.environ.get("SPIYWEB_NO_ATTACH"):
+        # The test suite sets this: a developer's live monitor must not
+        # collect every query the tests run in the same folder.
+        return None
+    marker = Path(directory) / WATCH_MARKER
+    try:
+        age = (time.time() if now is None else now) - marker.stat().st_mtime
+    except OSError:
+        return None
+    if age > stale_s:
+        return None
+    return Path(directory) / TRACE_FILENAME
+
+
+def ensure_private_dir(directory: Path) -> None:
+    """Create `directory` with a `.gitignore` that excludes everything in it."""
+    directory.mkdir(parents=True, exist_ok=True)
+    ignore = directory / ".gitignore"
+    if not ignore.exists():
+        ignore.write_text(GITIGNORE_ALL, encoding="utf-8")
+
+
+def _append_line(path: Path, record: TraceRecord) -> None:
+    """One binary write in append mode - the closest thing to atomic that
+    two application processes sharing a file get on every platform."""
+    line = json.dumps(record.to_dict(), ensure_ascii=False) + "\n"
+    with path.open("ab") as handle:
+        handle.write(line.encode("utf-8"))
 
 
 @dataclass(frozen=True)
@@ -505,13 +560,22 @@ class TraceStore:
         return self._sequence
 
     def append(self, record: TraceRecord) -> TraceRecord:
-        """Keep `record`, and write it too when a directory was configured."""
+        """Keep `record`; write it too when a directory was configured, or
+        when a `spiyweb` monitor is listening in `attach_dir` right now."""
         self._records.append(record)
         self._sequence = record.sequence + 1
         if self._path is not None:
-            line = json.dumps(record.to_dict(), ensure_ascii=False)
-            with self._path.open("a", encoding="utf-8") as handle:
-                handle.write(line + "\n")
+            _append_line(self._path, record)
+        elif self._config.attach_dir is not None:
+            target = attached_trace_path(
+                self._config.attach_dir, stale_s=self._config.attach_stale_s
+            )
+            if target is not None:
+                try:
+                    ensure_private_dir(target.parent)
+                    _append_line(target, record)
+                except OSError:
+                    pass  # a monitor's convenience must never reach the app
         return record
 
     def records(self) -> tuple[TraceRecord, ...]:

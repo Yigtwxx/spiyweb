@@ -29,6 +29,28 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ### Changed
 
+- **Bare `spiyweb` is a screen, not a menu.** Typing `spiyweb` in a
+  terminal used to ask four questions; it now takes the window over the way
+  `claude` does - screen and scrollback wiped, a welcome box with the
+  spider, a transcript, a status line, a boxed `/` prompt and a status bar -
+  and asks nothing. Every question the menu asked is a command (`/query`,
+  `/lint`, `/index`, `/install`). The menu is still there behind `/menu`
+  and `spiyweb menu`, and it is what runs where a terminal cannot read
+  single keys or redraw a screen; a pipe still gets the usage text and
+  exit 2, so nothing scripted changes.
+- **Records reach the disk on a monitor's request too.** `TraceStore`
+  appended to a file only when `TraceConfig.directory` was set. It now also
+  appends to `<attach_dir>/traces.jsonl` while a `spiyweb` monitor's marker
+  in that folder is fresh (`TraceConfig.attach_dir`, default `.spiyweb`;
+  `None` switches it off - the production setting). Passage text lands
+  there, in a folder that ignores itself from git. Each record is one
+  binary append, on both paths.
+- `hop_ring_layout`, `ring_radii` and `layout_seed` moved out of
+  `spiyweb.scene` into `spiyweb.rings`, numpy-free; `scene` re-exports them
+  and the layout is unchanged in every measured property (the random start
+  angle now comes from `random.Random` instead of numpy's generator).
+- `spiyweb.terminal.bar` takes an optional block ramp, for ASCII consoles.
+
 - **The library default can spread.** 0.1.2 moved the terminal and the
   viewer onto the `explore` profile and left `SpiywebIndex.retrieve()` at a
   warning, so a first-time caller of the LIBRARY still got first contact
@@ -49,6 +71,33 @@ regression suite, and its CLI flags are not covered by the policy above.
   answer reports rather than from `RetrievalConfig()`.
 
 ### Added
+
+- **The live monitor** (`spiyweb`, `spiyweb watch [--dir]`): open a terminal
+  in the project folder while the application runs in another, and every
+  query the application makes is played here as it happens - the ranking
+  bars on the left growing in hop by hop, the ring map on the right, the
+  ledger line under both. The two processes meet through a marker file and
+  a tailed JSONL; no socket, no server, no code in the application. Only
+  closing the terminal ends it (ctrl-c twice inside a second is the
+  emergency exit). New stdlib-only modules: `keys` (raw keys with a
+  timeout), `rings`, `pet`, `animate` (pure frames from a `TraceRecord`),
+  `watch` (marker, tail, loop, screen) and `commands`.
+- `/` commands: `/help`, `/find` (files that `import spiyweb` and the index
+  they `open_index(...)`, which becomes the default for the next two),
+  `/query [index] <question>` (played from the answer's own record, never
+  through the file), `/lint`, `/index`, `/install [extra]` (the extras
+  table, or `pip`/`uv pip` into this interpreter after a y/n), `/replay [n]`,
+  `/config` (an arrow-key list: profile, ring map, spider, hop delay,
+  glyphs, colour - saved to `.spiyweb/monitor.json`), `/clear`, `/menu`,
+  `/version`. Text without a slash is a question for the current index.
+  A CLI error that says `pip install "spiyweb[x]"` says `/install x` here.
+- `TraceConfig.attach_dir` / `attach_stale_s`, `spiyweb.config.WatchConfig`
+  (the monitor's knobs; not in `spiyweb.__all__`), `spiyweb.trace.WATCH_MARKER`,
+  `attached_trace_path`, `ensure_private_dir`.
+- `spiyweb.terminal`: `HIDE_CURSOR`/`SHOW_CURSOR`, `CLEAR_SCREEN`, `HOME`,
+  `ERASE_LINE`, `cursor_to`, `clip`, `pad`, `printed_width`,
+  `supports_screen`, `supports_unicode`, `terminal_size`.
+- `spiyweb.wizard.discover(cwd=...)`: where "nearby" starts.
 
 - `spiyweb.DEFAULT_PROFILE`: the one source of the name the terminal, the
   viewer and the library all fall back to. The two `"explore"` literals in

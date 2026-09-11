@@ -350,16 +350,17 @@ def ask_text(question: str, *, default: str = "") -> str | None:
     return answer or default
 
 
-def discover() -> list[Found]:
+def discover(cwd: Path | None = None) -> list[Found]:
     """Find indexes nearby, so nobody has to type a path.
 
     An index is a directory holding `nodes.json` - the same test the CLI's
     own verbs use, so what the wizard offers is exactly what they accept.
+    `cwd` is where "nearby" starts; the process's own directory by default.
     """
     indexes: list[Found] = []
     seen: set[Path] = set()
     for root in SEARCH_ROOTS:
-        base = Path(root)
+        base = Path(root) if cwd is None else cwd / root
         if not base.is_dir():
             continue
         # Case-folded so the menu order is the same on every platform.

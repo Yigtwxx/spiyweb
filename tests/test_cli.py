@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 def test_every_verb_is_reachable() -> None:
     parser = build_parser()
-    for verb in ("version", "index", "query", "lint"):
+    for verb in ("version", "index", "query", "lint", "watch", "menu"):
         assert parser.parse_args([verb, *_stub(verb)]).command == verb
 
 
@@ -42,6 +42,8 @@ def _stub(verb: str) -> list[str]:
         "index": ["docs", "out"],
         "query": ["idx", "a question"],
         "lint": ["idx"],
+        "watch": [],
+        "menu": [],
     }[verb]
 
 

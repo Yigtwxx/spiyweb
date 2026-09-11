@@ -24,6 +24,7 @@ from spiyweb.config import (
     EntityEdgeConfig,
     EntityExtractionConfig,
     SemanticEdgeConfig,
+    TraceConfig,
 )
 from spiyweb.indexing import DocumentInput, TextUnit, build_index
 
@@ -31,8 +32,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from spiyweb.config import TraceConfig
     from spiyweb.session import SpiywebIndex
+    from spiyweb.trace import TraceRecord
 
 DOCUMENTS = (
     DocumentInput(
@@ -124,8 +125,72 @@ def open_tiny(
     """Open the tiny index with the fake embedder already wired in."""
 
     def _open(trace: TraceConfig | None = None, **options: object) -> SpiywebIndex:
+        # Never attach to a developer's live monitor: a `spiyweb` running in
+        # the repo root would otherwise collect every test query.
+        if trace is None:
+            trace = TraceConfig(attach_dir=None)
         return open_index(
             tiny_index_root, embedder=FakeEmbedder(), trace=trace, **options
         )
 
     return _open
+
+
+def canonical_record(**overrides: object) -> TraceRecord:
+    """The §2.6 trace as a hand-built record: A, C at hop 0; B, D at hop 1
+    with D converging; F at hop 2; A_dup suppressed by A. No index needed."""
+    from spiyweb.trace import TraceEvent, TraceNode, TracePath, TraceRecord
+
+    def node(id_: str, hop: int, energy: float, **extra: object) -> TraceNode:
+        return TraceNode(
+            id=id_,
+            source_id=id_.lower(),
+            layer="chunk",
+            energy=energy,
+            hop=hop,
+            votes=int(extra.pop("votes", 1)),
+            **extra,  # type: ignore[arg-type]
+        )
+
+    fields: dict[str, object] = dict(
+        trace_id="canonical",
+        sequence=0,
+        recorded_at="2026-09-11T00:00:00.000+00:00",
+        kind="plain",
+        query="which tower did tesla build",
+        nodes=(
+            node("A", 0, 5.625, votes=2, seed_similarity=0.9),
+            node("C", 0, 4.375, seed_similarity=0.7),
+            node("D", 1, 2.875),
+            node("B", 1, 2.25),
+            node("F", 2, 1.725),
+            node("A_dup", -1, 0.0, suppressed_by="A"),
+        ),
+        edges=(),
+        paths=(
+            TracePath(node="D", steps=("A", "D"), hop=1, energy=2.875, converging=1),
+            TracePath(
+                node="F", steps=("A", "D", "F"), hop=2, energy=1.725, converging=0
+            ),
+        ),
+        clusters=(),
+        events=(TraceEvent(kind="suppressed", node="A_dup", other="A"),),
+        stop_reason="threshold",
+        hops_used=2,
+        injected_energy=10.0,
+        threshold=1.5,
+        total_energy=16.85,
+        node_count=5,
+        dedup_mode="adaptive",
+        profile="explore",
+        elapsed_ms=3.0,
+    )
+    fields.update(overrides)
+    return TraceRecord(**fields)  # type: ignore[arg-type]
+
+
+@pytest.fixture(autouse=True)
+def _never_attach_to_a_live_monitor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test, always: whatever `.spiyweb/watch` sits in the cwd, records
+    stay out of it. The attach tests opt back in by clearing the variable."""
+    monkeypatch.setenv("SPIYWEB_NO_ATTACH", "1")

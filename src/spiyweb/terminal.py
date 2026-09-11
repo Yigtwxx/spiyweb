@@ -39,15 +39,38 @@ if TYPE_CHECKING:
     from typing import TextIO
 
 __all__ = [
+    "CLEAR_SCREEN",
+    "ERASE_LINE",
+    "HIDE_CURSOR",
+    "HOME",
+    "SHOW_CURSOR",
     "bar",
+    "clip",
+    "cursor_to",
     "hop_color",
+    "pad",
     "paint",
+    "printed_width",
     "rule",
     "supports_color",
+    "supports_screen",
+    "supports_unicode",
+    "terminal_size",
     "terminal_width",
 ]
 
 RESET = "\x1b[0m"
+
+HIDE_CURSOR, SHOW_CURSOR = "\x1b[?25l", "\x1b[?25h"
+"""Hidden while a screen is being redrawn, shown again in a `finally`,
+always: a program that exits with the cursor hidden leaves the next shell
+looking broken."""
+
+CLEAR_SCREEN = "\x1b[2J\x1b[3J\x1b[H"
+"""Screen AND scrollback, then home - what typing `claude` does to a shell.
+The monitor owns the whole window from then on."""
+
+HOME, ERASE_LINE = "\x1b[H", "\x1b[2K"
 
 # Two families and a grey, and the split carries meaning rather than taste:
 # **blue is the web working, red is something wrong.** A reader who learns
@@ -181,19 +204,21 @@ def terminal_width(fallback: int = DEFAULT_WIDTH) -> int:
     return max(MIN_WIDTH, min(columns, 120))
 
 
-def bar(value: float, maximum: float, width: int) -> str:
+def bar(value: float, maximum: float, width: int, blocks: str = _BLOCKS) -> str:
     """A proportional bar with eighth-character resolution.
 
     Any positive value gets at least one visible mark. A node that activated
     at all is not the same as a node that did not, and rounding it to an
-    empty bar would say it was.
+    empty bar would say it was. `blocks` is the ramp from empty to full; the
+    default is the eighth blocks, an ASCII console passes a shorter one.
     """
     if width <= 0 or maximum <= 0.0 or value <= 0.0:
         return ""
+    steps = len(blocks) - 1
     share = min(value / maximum, 1.0)
-    eighths = round(share * width * 8)
-    full, remainder = divmod(max(eighths, 1), 8)
-    return _BLOCKS[-1] * full + (_BLOCKS[remainder] if remainder else "")
+    units = round(share * width * steps)
+    full, remainder = divmod(max(units, 1), steps)
+    return blocks[-1] * full + (blocks[remainder] if remainder else "")
 
 
 def rule(title: str, width: int, *, enabled: bool = True) -> str:
@@ -229,6 +254,82 @@ def columns(rows: Sequence[Sequence[str]], gap: int = 2) -> list[str]:
             parts.append(cell + " " * pad if index < len(row) - 1 else cell)
         lines.append((" " * gap).join(parts).rstrip())
     return lines
+
+
+def cursor_to(row: int) -> str:
+    """Move to the first column of `row` (1-based)."""
+    return f"\x1b[{row};1H"
+
+
+def terminal_size(fallback: tuple[int, int] = (DEFAULT_WIDTH, 24)) -> tuple[int, int]:
+    """`(columns, rows)` of the terminal, uncapped - a full-screen layout
+    wants every column, unlike a report that reads better narrow."""
+    size = shutil.get_terminal_size(fallback=fallback)
+    return max(MIN_WIDTH, size.columns), max(8, size.lines)
+
+
+def supports_screen(stream: TextIO | None = None) -> bool:
+    """Whether a full-screen redraw is worth attempting: a terminal that is
+    not dumb, with VT sequences on. Independent of colour - `NO_COLOR` turns
+    paint off, not cursor movement."""
+    target = stream if stream is not None else sys.stdout
+    try:
+        if not target.isatty():
+            return False
+    except (AttributeError, ValueError):
+        return False
+    if os.environ.get("TERM") == "dumb":
+        return False
+    if sys.platform == "win32":
+        return _enable_windows_vt()
+    return True
+
+
+def supports_unicode(stream: TextIO | None = None) -> bool:
+    """Whether box drawing and braille are safe to print. `SPIYWEB_ASCII=1`
+    forces the plain glyph set on any terminal."""
+    if os.environ.get("SPIYWEB_ASCII"):
+        return False
+    target = stream if stream is not None else sys.stdout
+    encoding = (getattr(target, "encoding", None) or "").lower().replace("-", "")
+    return encoding in ("utf8", "utf16", "utf32")
+
+
+def clip(text: str, width: int) -> str:
+    """Cut `text` to `width` printed columns, keeping escape sequences intact
+    and closing any colour that was still open at the cut."""
+    if width <= 0:
+        return ""
+    if "\x1b" not in text:
+        return text[:width]
+    out: list[str] = []
+    seen = 0
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == "\x1b":
+            end = text.find("m", index)
+            end = len(text) - 1 if end < 0 else end
+            out.append(text[index : end + 1])
+            index = end + 1
+            continue
+        if seen < width:
+            out.append(char)
+            seen += 1
+        index += 1
+    clipped = "".join(out)
+    return clipped if clipped.endswith(RESET) else clipped + RESET
+
+
+def pad(text: str, width: int) -> str:
+    """`text` clipped and space-padded to exactly `width` printed columns."""
+    text = clip(text, width)
+    return text + " " * (width - printed_width(text))
+
+
+def printed_width(text: str) -> int:
+    """Length with escape sequences removed."""
+    return _printed_width(text)
 
 
 def _printed_width(text: str) -> int:

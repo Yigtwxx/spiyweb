@@ -173,9 +173,15 @@ src/spiyweb/
 ├── profiles.py           # precise / explore / compare propagation profiles
 ├── thermal.py            # ThermalSession: conversation warmth across turns
 ├── config.py             # dataclass: damping, threshold, max_hop, max_nodes, weights
-├── cli.py                # `spiyweb` command: version / index / query / lint
-├── terminal.py           # ANSI colour and bars, zero dependencies
-├── wizard.py             # bare `spiyweb`: guided menu, never in a pipe
+├── cli.py                # `spiyweb` command: watch / version / index / query / lint / menu
+├── terminal.py           # ANSI colour, bars, screen primitives; zero dependencies
+├── keys.py               # raw keypresses with a timeout (msvcrt / termios), stdlib
+├── watch.py              # bare `spiyweb`: the live monitor - marker, tail, loop, screen
+├── commands.py           # the monitor's `/` commands: query, lint, index, install, find, config
+├── animate.py            # pure frames of one TraceRecord: ranking bars + ring map
+├── pet.py                # the spider in the welcome box (braille silhouette, ASCII fallback)
+├── rings.py              # the hop-ring layout rule, numpy-free; scene.py re-exports it
+├── wizard.py             # `spiyweb menu` / `/menu`: the old guided menu, never in a pipe
 ├── store.py              # numpy + FAISS single-file vector store (outside core/)
 │                         #   + FAISS-backed twin of the semantic edge builder
 ├── output.py             # result structure, paths, clusters, confidence, conflicts
@@ -200,10 +206,16 @@ src/spiyweb/
 There is no browser face in the tree any more. The React front end, the
 FastAPI viewer package (`spiyweb.viewer`, `inspect_url()`, `spiyweb view`,
 the `[web]` extra) and the `server/` measurement rig were **removed on
-2026-09-11** — the owner has a different interface in mind. What stayed is
-everything that interface will need and that never depended on a browser:
-the trace layer (`trace.py`), the energy ledger (`ledger.py`) and the
-render-agnostic scene (`scene.py`, numpy only, `spiyweb[view]`).
+2026-09-11**. **The terminal is the interface** (same day): bare `spiyweb`
+takes the window over - welcome box with the spider, transcript, a `/`
+prompt, status bar - and plays every query the application in the next
+terminal makes, hop by hop. The two processes meet through a marker file
+(`.spiyweb/watch`, heartbeat = mtime) and a tailed `traces.jsonl` that the
+library appends to while the marker is fresh (`TraceConfig.attach_dir`;
+`None` in production). No socket, no server, no code in the application.
+The monitor draws from `trace.py`, `ledger.py` and `rings.py` (the ring rule
+moved out of `scene.py` so nothing in the monitor imports numpy), and every
+frame is a pure function in `animate.py`, tested without a terminal.
 
 ### Boundary rules — the single most important thing in this file
 
