@@ -90,7 +90,7 @@ from spiyweb.session import (
 from spiyweb.thermal import ThermalSession
 from spiyweb.trace import TraceLedger, TraceRecord, TraceStore, load_traces
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 __all__ = [
     "COMPARE",

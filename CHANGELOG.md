@@ -27,6 +27,18 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-09-11
+
+The terminal is the interface. `pip install spiyweb` (or `uv tool install
+spiyweb`), open a terminal in the project folder, type `spiyweb`: the
+window becomes the monitor, and every query the application in the next
+terminal - or one started with `! python app.py` - makes is played hop by
+hop. MINOR bump: bare `spiyweb` changed behaviour and the browser face,
+`spiyweb.viewer`, `inspect_url()`, `spiyweb view` and the `[web]` extra
+are gone (see Removed).
+
 ### Changed
 
 - **Bare `spiyweb` is a screen, not a menu.** Typing `spiyweb` in a
@@ -98,6 +110,10 @@ regression suite, and its CLI flags are not covered by the policy above.
 - The input line has a cursor: left/right move inside it, home/end and
   ctrl-a/ctrl-e jump, delete removes under it, typing inserts there; the
   caret sits on the character it covers.
+- Mouse: the wheel scrolls the transcript, a left click chooses a list
+  item (`/config`, an index to pick) or a command suggestion under the
+  prompt. SGR mouse reporting, VT input on the Windows console, both
+  switched off again on exit.
 - `TraceConfig.attach_dir` / `attach_stale_s`, `spiyweb.config.WatchConfig`
   (the monitor's knobs; not in `spiyweb.__all__`), `spiyweb.trace.WATCH_MARKER`,
   `attached_trace_path`, `ensure_private_dir`.

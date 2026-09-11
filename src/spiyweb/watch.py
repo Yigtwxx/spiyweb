@@ -44,8 +44,10 @@ from spiyweb.keys import (
     BACKSPACE,
     DELETE,
     DISABLE_FOCUS,
+    DISABLE_MOUSE,
     DOWN,
     ENABLE_FOCUS,
+    ENABLE_MOUSE,
     END_KEY,
     ENTER,
     ESCAPE,
@@ -57,6 +59,8 @@ from spiyweb.keys import (
     RIGHT,
     TAB,
     UP,
+    is_mouse,
+    parse_mouse,
     poll_raw,
 )
 from spiyweb.pet import pet_lines, pet_width
@@ -67,8 +71,10 @@ from spiyweb.terminal import (
     HOME,
     SHOW_CURSOR,
     cursor_to,
+    enable_windows_vt_input,
     pad,
     printed_width,
+    restore_windows_input,
     supports_color,
     supports_screen,
     supports_unicode,
@@ -103,6 +109,9 @@ DOUBLE_INTERRUPT_S = 1.0
 
 JOB_LINES_PER_TICK = 20
 """How much of a job's output one tick may log; the rest waits its turn."""
+
+MOUSE_SCROLL_ROWS = 3
+"""Transcript rows one wheel notch moves."""
 
 
 PROFILES = ("explore", "precise", "compare")
@@ -415,6 +424,8 @@ class Monitor:
         self.drawn: list[str] = []
         self.last_size = (0, 0)
         self.focused = True
+        self.scroll = 0
+        self.hits: dict[int, tuple[str, str]] = {}
         self.debug = _debug_log(self.directory)
         self.tick_count = 0
 
@@ -474,6 +485,7 @@ class Monitor:
     def log(self, *lines: str) -> None:
         """Append to the transcript, the way a reply appears under a prompt."""
         self.transcript.extend(lines)
+        self.scroll = 0
         self.dirty = True
 
     def echo(self, command: str) -> None:
@@ -706,10 +718,35 @@ class Monitor:
         if live:
             keep = max(0, room - len(live) - 1)
             body = (body[-keep:] if keep else []) + ["", *live]
-        body += self.picker_lines(width)
-        body = body[-room:] if room > 0 else []
+        picker_at = len(body)
+        picker = self.picker_lines(width)
+        body += picker
+        self.scroll = max(0, min(self.scroll, max(0, len(body) - room)))
+        end = len(body) - self.scroll
+        start = max(0, end - room)
+        body = body[start:end] if room > 0 else []
         body += [""] * (room - len(body))
+        self.hits = self._hit_rows(len(top), room, picker_at, start, end)
         return [pad(line, width) for line in top + body + bottom]
+
+    def _hit_rows(
+        self, top: int, room: int, picker_at: int, start: int, end: int
+    ) -> dict[int, tuple[str, str]]:
+        """Which screen row (1-based) a click would choose: a picker option
+        or a command suggestion. Only what is on screen right now counts."""
+        hits: dict[int, tuple[str, str]] = {}
+        if self.picker is not None:
+            # picker_lines(): a blank, the title, then one row per option
+            for index, (value, _) in enumerate(self.picker.options):
+                body_index = picker_at + 2 + index
+                if start <= body_index < end:
+                    hits[top + (body_index - start) + 1] = ("pick", value)
+        found = self.suggestions()
+        if found:
+            after_input = top + room + 1 + 3  # status line, then the boxed input
+            for index, (usage, _) in enumerate(found[:6]):
+                hits[after_input + index + 1] = ("suggest", usage.split()[0])
+        return hits
 
     def draw(self, now: float, *, force: bool = False) -> None:
         size = self.size()
@@ -828,6 +865,9 @@ class Monitor:
         if key in (FOCUS_IN, FOCUS_OUT):
             self.focused = key == FOCUS_IN
             return
+        if is_mouse(key):
+            self._mouse(key)
+            return
         if key != TAB:
             self.tab_seed = None
         if key == "\x03":
@@ -892,6 +932,30 @@ class Monitor:
                 )
         elif key and key not in NAMED and key.isprintable():
             self.insert(key)
+
+    def _mouse(self, key: str) -> None:
+        """Wheel scrolls the transcript; a left click picks what it lands on."""
+        button, _column, row, pressed = parse_mouse(key)
+        if button in (64, 65):
+            self.scroll += MOUSE_SCROLL_ROWS if button == 64 else -MOUSE_SCROLL_ROWS
+            self.scroll = max(0, self.scroll)
+            return
+        if button != 0 or not pressed:
+            return
+        hit = self.hits.get(row)
+        if hit is None:
+            return
+        kind, value = hit
+        if kind == "pick" and self.picker is not None:
+            picker = self.picker
+            picker.cursor = next(
+                (i for i, (v, _) in enumerate(picker.options) if v == value), 0
+            )
+            if not picker.sticky:
+                self.picker = None
+            picker.on_choose(value)
+        elif kind == "suggest":
+            self.buffer = value + " "
 
     def _picker_key(self, key: str) -> None:
         picker = self.picker
@@ -967,6 +1031,7 @@ class Monitor:
             ("ctrl-u", "clear the line"),
             ("ctrl-l", "clear the transcript"),
             ("any key", "skip a playing query to its last frame"),
+            ("mouse", "wheel scrolls, a click picks a list item or suggestion"),
             ("ctrl-c twice", "leave (or just close the terminal)"),
         ]
         return [self.paint("shortcuts", "bold")] + [
@@ -988,6 +1053,7 @@ class Monitor:
         return [pad(line, width) for line in lines]
 
     def _submit(self) -> None:
+        self.scroll = 0
         line, self.buffer = self.buffer.strip(), ""
         if self.prompt is not None:
             prompt, self.prompt = self.prompt, None
@@ -1064,8 +1130,9 @@ class Monitor:
     def run(self) -> int:
         out = self.write
         assert out is not None and self.poll is not None
-        out(HIDE_CURSOR + CLEAR_SCREEN + ENABLE_FOCUS)
+        out(HIDE_CURSOR + CLEAR_SCREEN + ENABLE_FOCUS + ENABLE_MOUSE)
         self.flush()
+        previous_input = enable_windows_vt_input()
         self.marker.start()
         if self.debug:
             self.debug(
@@ -1101,12 +1168,13 @@ class Monitor:
                 import traceback
 
                 self.debug("crash\n" + traceback.format_exc())
-            out(DISABLE_FOCUS + SHOW_CURSOR + "\n")
+            out(DISABLE_MOUSE + DISABLE_FOCUS + SHOW_CURSOR + "\n")
             raise failure
         finally:
             self.stop_jobs()
             self.marker.stop()
-            out(DISABLE_FOCUS + SHOW_CURSOR + "\n")
+            restore_windows_input(previous_input)
+            out(DISABLE_MOUSE + DISABLE_FOCUS + SHOW_CURSOR + "\n")
             self.flush()
         return 0
 

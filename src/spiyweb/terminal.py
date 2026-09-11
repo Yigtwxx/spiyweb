@@ -47,10 +47,12 @@ __all__ = [
     "bar",
     "clip",
     "cursor_to",
+    "enable_windows_vt_input",
     "hop_color",
     "pad",
     "paint",
     "printed_width",
+    "restore_windows_input",
     "rule",
     "supports_color",
     "supports_screen",
@@ -143,6 +145,38 @@ def supports_color(stream: TextIO | None = None) -> bool:
     if sys.platform == "win32":
         return _enable_windows_vt()
     return True
+
+
+def enable_windows_vt_input() -> int | None:
+    """Turn on VT input on the Windows console so mouse reports (and arrows)
+    arrive as escape sequences through `getwch`; returns the previous mode
+    for `restore_windows_input`, or `None` off Windows / on failure."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        handle = kernel32.GetStdHandle(-10)
+        mode = ctypes.c_uint()
+        if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return None
+        wanted = (mode.value | 0x0200) & ~0x0040  # VT input on, quick edit off
+        return int(mode.value) if kernel32.SetConsoleMode(handle, wanted) else None
+    except Exception:
+        return None
+
+
+def restore_windows_input(mode: int | None) -> None:
+    if mode is None or sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-10), mode)
+    except Exception:
+        pass
 
 
 def _enable_windows_vt() -> bool:

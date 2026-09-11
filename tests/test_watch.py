@@ -540,3 +540,55 @@ def test_a_bang_python_is_the_monitors_python() -> None:
     assert same_python("PY -m mod") == f'"{sys.executable}" -m mod'
     assert same_python("python") == f'"{sys.executable}"'
     assert same_python("npm start") == "npm start"
+
+
+def test_the_wheel_scrolls_the_transcript_and_typing_snaps_back(tmp_path: Path) -> None:
+    driver = Driver([None])
+    monitor, _ = make_monitor(tmp_path, driver, size=(100, 24))
+    monitor.transcript = [f"line {n}" for n in range(60)]
+    bottom = monitor.screen(0.0)
+    assert any("line 59" in row for row in bottom)
+    monitor.handle_key("mouse:64:5:5:press", 0.0)
+    monitor.handle_key("mouse:64:5:5:press", 0.0)
+    scrolled = monitor.screen(0.0)
+    assert not any("line 59" in row for row in scrolled)
+    assert any("line 53" in row for row in scrolled)
+    monitor.handle_key("mouse:65:5:5:press", 0.0)
+    assert monitor.scroll == 3
+    monitor.handle_key("/", 0.0)
+    monitor.handle_key("enter", 0.0)
+    assert monitor.scroll == 0
+
+
+def test_a_click_on_a_picker_option_chooses_it(tmp_path: Path) -> None:
+    driver = Driver([None])
+    monitor, _ = make_monitor(tmp_path, driver, size=(100, 30))
+    chosen: list[str] = []
+    monitor.pick(
+        "which?", [("a", "first"), ("b", "second"), ("c", "third")], chosen.append
+    )
+    lines = monitor.screen(0.0)
+    row_of_second = next(i for i, line in enumerate(lines) if "second" in line) + 1
+    assert monitor.hits[row_of_second] == ("pick", "b")
+    monitor.handle_key(f"mouse:0:10:{row_of_second}:press", 0.0)
+    assert chosen == ["b"] and monitor.picker is None
+
+
+def test_a_click_on_a_suggestion_completes_the_command(tmp_path: Path) -> None:
+    driver = Driver([None])
+    monitor, _ = make_monitor(tmp_path, driver, size=(100, 30))
+    monitor.buffer = "/re"
+    lines = monitor.screen(0.0)
+    row = (
+        next(
+            i
+            for i, line in enumerate(lines)
+            if "/replay" in line and "play the last" in line
+        )
+        + 1
+    )
+    assert monitor.hits[row] == ("suggest", "/replay")
+    monitor.handle_key(f"mouse:0:4:{row}:press", 0.0)
+    assert monitor.buffer == "/replay "
+    monitor.handle_key("mouse:0:4:2:press", 0.0)  # a click on nothing changes nothing
+    assert monitor.buffer == "/replay "

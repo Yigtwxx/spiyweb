@@ -118,3 +118,17 @@ def test_home_end_and_delete_are_named_on_both_platforms() -> None:
         decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0))
         == HOME_KEY
     )
+
+
+def test_a_mouse_report_is_decoded_and_parsed() -> None:
+    from spiyweb.keys import is_mouse, parse_mouse
+
+    burst = list("[<0;12;7M")
+    key = decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0))
+    assert is_mouse(key)
+    assert parse_mouse(key) == (0, 12, 7, True)
+    burst = list("[<64;1;1m")
+    key = decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0))
+    assert parse_mouse(key) == (64, 1, 1, False)
+    burst = list("[<x;y;zM")
+    assert decode_escape(pending=lambda: bool(burst), read=lambda _: burst.pop(0)) == ""

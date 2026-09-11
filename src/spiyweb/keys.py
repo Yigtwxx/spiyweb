@@ -31,8 +31,10 @@ __all__ = [
     "BACKSPACE",
     "DELETE",
     "DISABLE_FOCUS",
+    "DISABLE_MOUSE",
     "DOWN",
     "ENABLE_FOCUS",
+    "ENABLE_MOUSE",
     "END_KEY",
     "ENTER",
     "ESCAPE",
@@ -40,11 +42,14 @@ __all__ = [
     "FOCUS_OUT",
     "HOME_KEY",
     "LEFT",
+    "MOUSE",
     "NAMED",
     "RIGHT",
     "TAB",
     "UP",
     "decode_escape",
+    "is_mouse",
+    "parse_mouse",
     "poll_raw",
 ]
 
@@ -52,6 +57,9 @@ UP, DOWN, LEFT, RIGHT = "up", "down", "left", "right"
 ENTER, BACKSPACE, ESCAPE, TAB = "enter", "backspace", "escape", "tab"
 FOCUS_IN, FOCUS_OUT = "focus_in", "focus_out"
 HOME_KEY, END_KEY, DELETE = "home", "end", "delete"
+MOUSE = "mouse"
+"""Prefix of a mouse report: `mouse:<button>:<column>:<row>:<press|release>`."""
+ENABLE_MOUSE, DISABLE_MOUSE = "\x1b[?1000h\x1b[?1006h", "\x1b[?1006l\x1b[?1000l"
 """What a terminal with focus reporting on (`ENABLE_FOCUS`) sends when the
 window gains or loses the keyboard - the caret follows."""
 NAMED = frozenset(
@@ -176,9 +184,38 @@ def decode_escape(pending: Callable[[], bool], read: Callable[[int], str]) -> st
     if read(1) not in ("[", "O"):
         return ""
     third = read(1)
+    if third == "<":
+        return _mouse_report(read)
     if third == "3" and pending() and read(1) == "~":  # ESC [ 3 ~ is Delete
         return DELETE
     return _POSIX_ARROWS.get(third, "")
+
+
+def _mouse_report(read: Callable[[int], str]) -> str:
+    """`ESC [ < b ; x ; y M` (press) or `m` (release), SGR encoding."""
+    body = ""
+    while len(body) < 24:
+        char = read(1)
+        if char in ("M", "m"):
+            break
+        body += char
+    else:
+        return ""
+    parts = body.split(";")
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        return ""
+    kind = "press" if char == "M" else "release"
+    return f"{MOUSE}:{parts[0]}:{parts[1]}:{parts[2]}:{kind}"
+
+
+def is_mouse(key: str) -> bool:
+    return key.startswith(MOUSE + ":")
+
+
+def parse_mouse(key: str) -> tuple[int, int, int, bool]:
+    """`(button, column, row, pressed)` from a mouse report, 1-based."""
+    _, button, column, row, kind = key.split(":")
+    return int(button), int(column), int(row), kind == "press"
 
 
 def _name_char(char: str) -> str:
