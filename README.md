@@ -53,7 +53,27 @@ entire value proposition.
 
 ## Try it
 
-Three commands, from an empty directory to what the retrieval did:
+The terminal is the interface. Install it, open a terminal in your project
+folder, type one word:
+
+```bash
+pip install spiyweb          # or: uv tool install spiyweb
+spiyweb
+```
+
+The window becomes the monitor: a welcome box, a transcript, a `/` prompt.
+Run your project in another terminal - or from the prompt, `! python app.py`
+- and every query it makes through `spiyweb.open_index(...)` is played
+there as it happens: the ranking bars growing in hop by hop on the left,
+the ring map on the right, the ledger line under both. No socket, no
+server, no code in your application: the monitor leaves a marker in
+`.spiyweb/`, the library appends its records there while the marker is
+fresh, the monitor tails them. `/find` locates the file that imports
+spiyweb and the index it opens; `/query`, `/lint`, `/index` and `/install`
+are the old menu's questions as commands; `/config` is an arrow-key list of
+the monitor's own knobs; `/help` lists the rest.
+
+The same verbs work without the screen, for scripts and pipes:
 
 ```bash
 pip install "spiyweb[index]"
@@ -211,9 +231,10 @@ for record in load_traces("traces/traces.jsonl"):
 ```
 
 The layout of a recorded call - hop rings, layers, a side-by-side against
-plain `top-k` - lives in `spiyweb.scene` (numpy only, `spiyweb[view]`), so
-one query produces one picture no matter what draws it. The browser face
-that used to draw it was removed after 0.1.2; what replaces it is open.
+plain `top-k` - lives in `spiyweb.scene` (numpy only, `spiyweb[view]`), and
+the hop-ring rule itself in `spiyweb.rings` (nothing at all), so one query
+produces one picture no matter what draws it. The terminal monitor is what
+draws it now; the browser face that used to was removed after 0.1.2.
 
 ## Phase 1 plan
 
