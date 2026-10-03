@@ -12,7 +12,7 @@
 
    On load the web is spun from the hub outward. Between queries, points of light
    drift along the silk and the web sways on springs in a slow wind. A seed lands
-   every couple of seconds somewhere on the web, and wherever the reader clicks
+   every few seconds somewhere on the web, and wherever the reader clicks
    the field, throwing a ring where it lands. The loop sleeps off-screen and in a hidden tab, and the pause button
    stops it (WCAG 2.2.2). Under reduced motion one pulse is drawn, finished and
    still. */
@@ -22,7 +22,7 @@ const DAMPING = 0.6;
 const FLOOR = 0.12; // see above: the picture's floor, not the library's
 const HOP_MS = 420; // one hop's travel along its threads
 const FADE_MS = 3200; // how long a lit node takes to go dark again
-const AUTO_MS = 2400; // a seed lands this often when nobody clicks
+const AUTO_MS = 3200; // a seed lands this often when nobody clicks
 const RADIALS = 18;
 const RINGS = 13;
 const SPIN_MS = 2600; // the web is spun from the hub outward when the page opens
@@ -337,11 +337,11 @@ export function initWebCanvas(): void {
                 const a = Math.sin(Math.min(1, Math.max(0, life)) * Math.PI) * 0.85;
                 const x = px(t.a) + (px(t.b) - px(t.a)) * m.t;
                 const y = py(t.a) + (py(t.b) - py(t.a)) * m.t;
-                ctx.fillStyle = `rgba(159, 214, 236, ${(a * 0.25).toFixed(3)})`;
+                ctx.fillStyle = `rgba(159, 214, 236, ${(a * 0.18).toFixed(3)})`;
                 ctx.beginPath();
                 ctx.arc(x, y, 5, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = `rgba(232, 246, 252, ${a.toFixed(3)})`;
+                ctx.fillStyle = `rgba(232, 246, 252, ${(a * 0.7).toFixed(3)})`;
                 ctx.beginPath();
                 ctx.arc(x, y, 1.3, 0, Math.PI * 2);
                 ctx.fill();
@@ -366,7 +366,7 @@ export function initWebCanvas(): void {
             const seedId = [...pulse.lit.entries()].find(([, l]) => l.from < 0)?.[0];
             const age = (now - pulse.started) / RIPPLE_MS;
             if (seedId !== undefined && age < 1) {
-                ctx.strokeStyle = `rgba(214, 238, 248, ${((1 - age) * 0.5).toFixed(3)})`;
+                ctx.strokeStyle = `rgba(214, 238, 248, ${((1 - age) * 0.35).toFixed(3)})`;
                 ctx.lineWidth = 1.5 * (1 - age) + 0.4;
                 ctx.beginPath();
                 ctx.arc(px(seedId), py(seedId), 6 + age * 90, 0, Math.PI * 2);
@@ -387,13 +387,13 @@ export function initWebCanvas(): void {
                 const bx = ax + (px(id) - ax) * travel;
                 const by = ay + (py(id) - ay) * travel;
                 // A wide soft stroke under a fine bright one: silk catching light.
-                ctx.strokeStyle = `rgba(110, 190, 230, ${(alpha * 0.24).toFixed(3)})`;
-                ctx.lineWidth = 3 + alpha * 5;
+                ctx.strokeStyle = `rgba(110, 190, 230, ${(alpha * 0.16).toFixed(3)})`;
+                ctx.lineWidth = 3 + alpha * 4;
                 ctx.beginPath();
                 ctx.moveTo(ax, ay);
                 ctx.lineTo(bx, by);
                 ctx.stroke();
-                ctx.strokeStyle = `rgba(225, 244, 252, ${Math.min(0.8, alpha * 0.85).toFixed(3)})`;
+                ctx.strokeStyle = `rgba(225, 244, 252, ${Math.min(0.62, alpha * 0.65).toFixed(3)})`;
                 ctx.lineWidth = 0.9 + alpha * 1.6;
                 ctx.beginPath();
                 ctx.moveTo(ax, ay);
@@ -401,11 +401,11 @@ export function initWebCanvas(): void {
                 ctx.stroke();
                 // The spark at the head of a hop still in flight.
                 if (travel < 1) {
-                    ctx.fillStyle = 'rgba(159, 214, 236, 0.22)';
+                    ctx.fillStyle = 'rgba(159, 214, 236, 0.15)';
                     ctx.beginPath();
                     ctx.arc(bx, by, 7, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.fillStyle = 'rgba(245, 252, 255, 0.85)';
+                    ctx.fillStyle = 'rgba(245, 252, 255, 0.65)';
                     ctx.beginPath();
                     ctx.arc(bx, by, 2.4, 0, Math.PI * 2);
                     ctx.fill();
@@ -415,11 +415,11 @@ export function initWebCanvas(): void {
                 const g = glow(pulse, id, now);
                 if (g <= 0.01) continue;
                 // A soft halo, then the bright core.
-                ctx.fillStyle = `rgba(159, 214, 236, ${(g * 0.15).toFixed(3)})`;
+                ctx.fillStyle = `rgba(159, 214, 236, ${(g * 0.1).toFixed(3)})`;
                 ctx.beginPath();
                 ctx.arc(px(id), py(id), 5 + g * 11, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = `rgba(232, 246, 252, ${(g * 0.8).toFixed(3)})`;
+                ctx.fillStyle = `rgba(232, 246, 252, ${(g * 0.6).toFixed(3)})`;
                 ctx.beginPath();
                 ctx.arc(px(id), py(id), 1.6 + g * 3.4, 0, Math.PI * 2);
                 ctx.fill();
