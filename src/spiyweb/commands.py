@@ -540,6 +540,10 @@ def _config(monitor: Monitor, _: Invocation) -> None:
             ("map", f"ring map       {on('on' if s.map_enabled else 'off', 'accent')}"),
             ("pet", f"spider         {on('on' if s.pet_enabled else 'off', 'accent')}"),
             (
+                "banner",
+                f"banner         {on('on' if s.banner_enabled else 'off', 'accent')}",
+            ),
+            (
                 "hop",
                 f"hop delay      {on(str(s.hop_delay_ms) + ' ms', 'accent')}"
                 + "   (0 = last frame only)",
@@ -565,6 +569,8 @@ def _config(monitor: Monitor, _: Invocation) -> None:
             s.map_enabled = not s.map_enabled
         elif value == "pet":
             s.pet_enabled = not s.pet_enabled
+        elif value == "banner":
+            s.banner_enabled = not s.banner_enabled
         elif value == "hop":
             current = (
                 HOP_DELAYS.index(s.hop_delay_ms) if s.hop_delay_ms in HOP_DELAYS else 0

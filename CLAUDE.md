@@ -180,6 +180,7 @@ src/spiyweb/
 ├── commands.py           # the monitor's `/` commands: query, lint, index, install, find, config
 ├── animate.py            # pure frames of one TraceRecord: ranking bars + ring map
 ├── pet.py                # the spider in the welcome box (braille silhouette, ASCII fallback)
+├── banner.py             # the SPIYWEB wordmark heading the transcript (same mark as site/)
 ├── rings.py              # the hop-ring layout rule, numpy-free; scene.py re-exports it
 ├── wizard.py             # `spiyweb menu` / `/menu`: the old guided menu, never in a pipe
 ├── store.py              # numpy + FAISS single-file vector store (outside core/)

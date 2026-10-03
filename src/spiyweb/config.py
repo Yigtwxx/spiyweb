@@ -1078,6 +1078,8 @@ class WatchConfig:
         max_rows: Ranking rows shown before "+n more".
         bar_width: Width of the energy bars.
         pet_enabled: Whether the spider sits in the welcome box.
+        banner_enabled: Whether the SPIYWEB wordmark sits in the welcome box,
+            left of the spider; dropped when the terminal is too small.
         sleep_after_s: Without a record for this long the status reads
             "no app attached", the marker notwithstanding.
         find_max_depth: How deep `/find` walks below the working directory.
@@ -1099,6 +1101,7 @@ class WatchConfig:
     max_rows: int = 12
     bar_width: int = 22
     pet_enabled: bool = True
+    banner_enabled: bool = True
     sleep_after_s: float = 60.0
     find_max_depth: int = 6
     find_max_files: int = 5000

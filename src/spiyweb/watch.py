@@ -1,10 +1,10 @@
 """Bare `spiyweb`: the terminal is the interface.
 
 Open a terminal in the project folder, type `spiyweb`, and the window is
-taken over - a welcome box with the spider, a transcript, a status line, a
-boxed prompt for `/` commands, a status bar. Nothing is asked. In another
-terminal the application runs; every query it makes lands here within a
-poll and is played hop by hop.
+taken over - a welcome box with the SPIYWEB wordmark and the spider, a
+transcript, a status line, a boxed prompt for `/` commands, a status bar.
+Nothing is asked. In another terminal the application runs; every
+query it makes lands here within a poll and is played hop by hop.
 
 How the two processes meet: the monitor drops `<attach_dir>/watch` and keeps
 touching it (the heartbeat); the library's `TraceStore` sees a fresh marker
@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING
 
 from spiyweb import __version__
 from spiyweb.animate import Glyphs, Style, block_height, query_block
+from spiyweb.banner import wordmark_lines, wordmark_width
 from spiyweb.config import WatchConfig
 from spiyweb.keys import (
     BACKSPACE,
@@ -65,7 +66,7 @@ from spiyweb.keys import (
     parse_mouse,
     poll_raw,
 )
-from spiyweb.pet import pet_lines, pet_width
+from spiyweb.pet import FULL, pet_lines, pet_width
 from spiyweb.terminal import (
     CLEAR_SCREEN,
     ERASE_LINE,
@@ -121,6 +122,14 @@ PAGE_ROWS = 10
 
 PROFILES = ("explore", "precise", "compare")
 HOP_DELAYS = (0, 300, 650, 1000)
+
+MARK_GAP = 2
+"""Columns between the wordmark, the spider and the text beside them - two,
+as the owner's other tools set their text beside their marks."""
+
+TEXT_BESIDE_MIN = 40
+"""The welcome text goes beside the wordmark and the spider only with this
+many columns to spare; under them otherwise."""
 
 
 class Marker:
@@ -342,6 +351,7 @@ class Settings:
     profile: str = "explore"
     map_enabled: bool = True
     pet_enabled: bool = True
+    banner_enabled: bool = True
     hop_delay_ms: int = 650
     ascii: bool = False
     color: bool = True
@@ -399,6 +409,7 @@ class Monitor:
         base = Settings(
             map_enabled=self.config.map_enabled,
             pet_enabled=self.config.pet_enabled,
+            banner_enabled=self.config.banner_enabled,
             hop_delay_ms=self.config.hop_delay_ms,
         )
         self.settings = Settings.load(self.directory / SETTINGS_FILENAME, base=base)
@@ -473,6 +484,7 @@ class Monitor:
             self.config,
             map_enabled=self.settings.map_enabled,
             pet_enabled=self.settings.pet_enabled,
+            banner_enabled=self.settings.banner_enabled,
             hop_delay_ms=self.settings.hop_delay_ms,
         )
         unicode = bool(self.unicode) and not self.settings.ascii
@@ -538,6 +550,9 @@ class Monitor:
             + self.paint(f"   cwd: {self.cwd}", "dim"),
             self.paint("/help for commands", "dim"),
         ]
+        marked = self.marked_welcome(width, rows, text)
+        if marked:
+            return marked
         if not self.config.pet_enabled:
             return self.boxed(text, width)
         frames = pet_lines(
@@ -557,6 +572,52 @@ class Monitor:
         return self.boxed(
             [a + "  " + b for a, b in zip(left, right, strict=True)], width
         )
+
+    def marked_welcome(self, width: int, rows: int, text: list[str]) -> list[str]:
+        """The welcome box with the SPIYWEB wordmark, the spider to its right
+        and the text beside both or under them - or nothing, and the plain
+        box stands: switched off, an ASCII console (the mark is block and box
+        glyphs), too narrow, or so short that the box would take a query's
+        map away."""
+        unicode = bool(self.unicode) and not self.settings.ascii
+        if not self.config.banner_enabled or not unicode:
+            return []
+        mark = wordmark_lines(color=self.style.color)
+        spider = FULL if self.config.pet_enabled else ()
+        height = max(len(mark), len(spider))
+        # The mark sits on the spider's last row: its own last row is shadow,
+        # and the spider's first is only the tips of its front legs.
+        mark = [" " * wordmark_width()] * (height - len(mark)) + mark
+        art = [
+            line
+            + (
+                " " * MARK_GAP + self.style.hop(spider[row], row * 5 // len(spider))
+                if spider
+                else ""
+            )
+            for row, line in enumerate(mark)
+        ]
+        art_width = wordmark_width() + (MARK_GAP + pet_width(spider) if spider else 0)
+        inner = width - 4
+        if inner < art_width:
+            return []
+        beside = inner - art_width - MARK_GAP
+        if beside >= TEXT_BESIDE_MIN:
+            right = ["", *text] if len(text) < height else text
+            right += [""] * (height - len(right))
+            box = self.boxed(
+                [
+                    line + " " * MARK_GAP + pad(words, beside)
+                    for line, words in zip(art, right, strict=False)
+                ],
+                width,
+            )
+        else:
+            box = self.boxed([*art, "", *[t for t in text if t]], width)
+        # The bottom of the screen (status, boxed input, status bar) and the
+        # line `screen()` keeps free, against the smallest map worth drawing.
+        room = rows - 1 - len(box) - 5
+        return box if room >= MAP_MIN_ROWS + 4 else []
 
     def _shown_dir(self) -> str:
         try:
