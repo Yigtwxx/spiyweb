@@ -72,6 +72,22 @@ def test_embed_passages_prepends_the_passage_prefix() -> None:
     assert encoder.calls[0]["sentences"] == ["passage: some corpus text"]
 
 
+def test_prefixes_follow_the_config_for_other_model_families() -> None:
+    encoder = FakeEncoder()
+    config = EmbeddingConfig(
+        model="some/other-model",
+        query_prefix="Instruct: find\nQuery: ",
+        passage_prefix="",
+    )
+    embedder = SentenceTransformerEmbedder(config, model=encoder)
+    embedder.embed_queries(["what is X"])
+    embedder.embed_passages(["some corpus text"])
+    assert encoder.calls[0]["sentences"] == ["Instruct: find\nQuery: what is X"]
+    assert encoder.calls[1]["sentences"] == ["some corpus text"], (
+        "an empty passage prefix must send the text untouched"
+    )
+
+
 def test_encode_always_normalises_and_forwards_batch_size() -> None:
     encoder = FakeEncoder()
     config = EmbeddingConfig(batch_size=7)
@@ -113,3 +129,25 @@ def test_detect_device_without_torch_names_the_extra() -> None:
 def test_real_model_load_without_the_extra_names_it() -> None:
     with pytest.raises(ImportError, match=r"spiyweb\[embed\]"):
         SentenceTransformerEmbedder()
+
+
+def test_model_name_stays_the_bare_name_under_the_e5_defaults() -> None:
+    embedder = SentenceTransformerEmbedder(model=FakeEncoder())
+    assert embedder.model_name == EmbeddingConfig().model, (
+        "every existing index recorded the bare name; the defaults must keep it"
+    )
+
+
+def test_model_name_carries_non_default_prefixes() -> None:
+    plain = SentenceTransformerEmbedder(
+        EmbeddingConfig(model="m", query_prefix="", passage_prefix=""),
+        model=FakeEncoder(),
+    )
+    e5_style = SentenceTransformerEmbedder(
+        EmbeddingConfig(model="m"), model=FakeEncoder()
+    )
+    assert plain.model_name != e5_style.model_name, (
+        "one model under two prompt formats is two vector spaces - the "
+        "recorded identity must tell them apart"
+    )
+    assert plain.model_name.startswith("m ")

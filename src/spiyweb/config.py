@@ -221,11 +221,21 @@ class EmbeddingConfig:
         batch_size: Encoding batch size.
         device: Explicit device string, or `None` to auto-resolve in the
             fixed order CUDA -> MPS -> CPU.
+        query_prefix: Role prefix put before every question-side text. The
+            default is e5's `"query: "`; another model family needs its own
+            (an instruction for Qwen3-Embedding, nothing for bge-m3), and a
+            wrong prefix degrades silently. A non-default pair becomes part
+            of the embedder's recorded `model_name`, so an index queried
+            under another prompt format is refused like another model.
+        passage_prefix: Role prefix put before every corpus-side text; e5's
+            `"passage: "` by default.
     """
 
     model: str = "intfloat/multilingual-e5-large"
     batch_size: int = 32
     device: str | None = None
+    query_prefix: str = "query: "
+    passage_prefix: str = "passage: "
 
     def __post_init__(self) -> None:
         if not self.model:

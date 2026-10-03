@@ -3,7 +3,9 @@
 The e5 model family requires a role prefix on every input - `"query: "` for
 questions, `"passage: "` for corpus text - and silently degrades without it.
 The prefix contract is therefore baked into the API: there is no un-prefixed
-encode method, so callers cannot forget it.
+encode method, so callers cannot forget it. The prefixes themselves come from
+`EmbeddingConfig` (e5's by default), because other model families use other
+ones.
 
 Vectors are always L2-normalised, which is what makes the store's inner
 product equal cosine similarity - that contract lives here, not in the store.
@@ -24,9 +26,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 Device = Literal["cuda", "mps", "cpu"]
-
-_QUERY_PREFIX = "query: "
-_PASSAGE_PREFIX = "passage: "
 
 
 def resolve_device(*, cuda_available: bool, mps_available: bool) -> Device:
@@ -96,9 +95,17 @@ class SentenceTransformerEmbedder:
         `build_index` records it in the store so a query embedded by a
         different model can be refused instead of silently answered: two
         unrelated models can share a dimension, and cosine across two spaces
-        returns confident nonsense.
+        returns confident nonsense. The role prefixes are part of the
+        identity for the same reason - one model under two prompt formats
+        is two vector spaces - so a non-default pair is appended to the
+        name. The e5 defaults are not, which keeps every existing index's
+        recorded name valid.
         """
-        return self._config.model
+        defaults = EmbeddingConfig()
+        query, passage = self._config.query_prefix, self._config.passage_prefix
+        if (query, passage) == (defaults.query_prefix, defaults.passage_prefix):
+            return self._config.model
+        return f"{self._config.model} [query={query!r} passage={passage!r}]"
 
     def _load_model(self) -> EncoderLike:
         try:
@@ -114,12 +121,14 @@ class SentenceTransformerEmbedder:
         return SentenceTransformer(self._config.model, device=device)
 
     def embed_queries(self, texts: Sequence[str]) -> list[list[float]]:
-        """Embed question-side texts with the `"query: "` role prefix."""
-        return self._encode([_QUERY_PREFIX + text for text in texts])
+        """Embed question-side texts with the configured query prefix."""
+        prefix = self._config.query_prefix
+        return self._encode([prefix + text for text in texts])
 
     def embed_passages(self, texts: Sequence[str]) -> list[list[float]]:
-        """Embed corpus-side texts with the `"passage: "` role prefix."""
-        return self._encode([_PASSAGE_PREFIX + text for text in texts])
+        """Embed corpus-side texts with the configured passage prefix."""
+        prefix = self._config.passage_prefix
+        return self._encode([prefix + text for text in texts])
 
     def _encode(self, prefixed: list[str]) -> list[list[float]]:
         rows = self._model.encode(
