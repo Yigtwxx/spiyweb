@@ -38,6 +38,10 @@ entity = ["spacy>=3.7"]
 # Index-time NLI contradiction marking (D26): the real model wrapper only.
 nli = ["torch>=2.2", "transformers>=4.40"]
 index = ["spiyweb[store]", "spiyweb[embed]", "spiyweb[entity]"]
+# Retriever adapters for other frameworks (spiyweb.integrations.*): each is
+# its own extra, so neither framework ever becomes a dependency of the core.
+langchain = ["langchain-core>=0.3"]
+llamaindex = ["llama-index-core>=0.12"]
 
 # One terminal command, four verbs, each wrapping something the Python API
 # already does. `spiyweb version` must work on a bare install - that is
