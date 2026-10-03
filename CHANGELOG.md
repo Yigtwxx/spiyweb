@@ -37,6 +37,21 @@ regression suite, and its CLI flags are not covered by the policy above.
   measured and lost: on the sealed MuSiQue tuning set width 2 moved S@5 by
   −.0072 CI [−.0136, −.0010] (HotpotQA +.0092, 2Wiki −.0022 n.s.), so no
   retrieval number changes with this release.
+- `spiyweb.indexing.sync_index` and `IndexSync`: incremental indexing.
+  Pass the whole current corpus; chunks whose text is unchanged keep their
+  vectors, entities and propositions, and only new or changed chunks are
+  embedded and extracted again. The derived edge layers are rebuilt, so a
+  synced index is artifact-for-artifact what `build_index` writes for the
+  same corpus (tested). A different embedding model or extraction setting
+  is refused instead of mixed.
+- `spiyweb.integrations.langchain.SpiywebRetriever` (extra
+  `spiyweb[langchain]`) and `spiyweb.integrations.llamaindex.SpiywebLlamaRetriever`
+  (extra `spiyweb[llamaindex]`): the web behind each framework's retriever
+  interface, in its own energy order, with votes, hop and source in the
+  metadata. `import spiyweb` imports neither framework.
+- Harness: an `answer` stage (`python -m spiyweb.evaluation.run answer`)
+  reads a finished run's top-k passages with one fixed reader and reports
+  EM / token F1 per system with paired intervals.
 - `EmbeddingConfig.query_prefix` / `passage_prefix`: the role prefixes are
   now configuration instead of being fixed to e5's, so another embedding
   family can be used with its own prompt format. The defaults are e5's

@@ -188,11 +188,14 @@ src/spiyweb/
 ├── banner.py             # the SPIYWEB wordmark heading the transcript (same mark as site/)
 ├── rings.py              # the hop-ring layout rule, numpy-free; scene.py re-exports it
 ├── wizard.py             # `spiyweb menu`: the old guided menu, never in a pipe
+├── integrations/         # framework retriever adapters, each its own extra
+│   ├── langchain.py      # SpiywebRetriever (spiyweb[langchain])
+│   └── llamaindex.py     # SpiywebLlamaRetriever (spiyweb[llamaindex])
 ├── store.py              # numpy + FAISS single-file vector store (outside core/)
 │                         #   + FAISS-backed twin of the semantic edge builder
 ├── output.py             # result structure, paths, clusters, confidence, conflicts
 ├── lint.py               # corpus lint (D37): orphans, hubs, duplicates, conflicts
-├── indexing.py           # corpus-agnostic build_index + artifact loaders
+├── indexing.py           # corpus-agnostic build_index + sync_index (incremental) + loaders
 ├── session.py            # SpiywebIndex: open an index, ask, get text back
 ├── trace.py              # recorded calls (D38): self-contained, JSONL-able
 ├── ledger.py             # energy ledger: held / dissipated / destroyed
@@ -205,6 +208,7 @@ src/spiyweb/
     ├── baseline.py       # plain top-k + IRCoT-style iterative retrieval
     ├── cache.py          # deterministic prompt-hash LLM cache (reproducible runs)
     ├── stats.py          # paired bootstrap CI - the protocol's interval, one copy
+    ├── answer.py         # answer quality: fixed reader, EM / token F1 per system
     ├── index.py          # corpus -> vectors + entities + edge-layer artifacts
     └── run.py            # CLI: download / index / evaluate / report
 ```
