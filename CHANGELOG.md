@@ -29,6 +29,18 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 Nothing yet.
 
+## [0.2.2] - 2026-10-03
+
+### Added
+
+- The monitor's welcome box carries the **SPIYWEB wordmark** - the landing
+  page's mark, six rows of block letters with their shadow, shading from
+  frost-white into glacier blue - with the spider to its right. The welcome
+  text sits beside them on a wide terminal and under them otherwise.
+  `/config` switches it off (`banner`), and the plain box stands whenever
+  the mark would not fit: an ASCII console, fewer than 80 columns, or a
+  terminal so short that the box would take a query's ring map away.
+
 ## [0.2.1] - 2026-09-11
 
 ### Changed

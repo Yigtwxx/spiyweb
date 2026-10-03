@@ -45,7 +45,7 @@ with spiyweb.open_index("my-index") as index:
     for path in answer.paths():  # how the energy reached each node
         print(path)`;
 
-export const version = '0.2.1';
+export const version = '0.2.2';
 export const repo = 'https://github.com/Yigtwxx/spiyweb';
 export const pypi = 'https://pypi.org/project/spiyweb/';
 
