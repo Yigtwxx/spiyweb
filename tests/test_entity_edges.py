@@ -147,3 +147,32 @@ def test_the_floor_never_binds_on_a_corpus_the_ratio_can_serve() -> None:
     # df = 200 against a ceiling of 0.02 * 200 = 4: the guard still fires,
     # exactly as it did before the floor existed.
     assert build_entity_edges(shared, EntityEdgeConfig()) == []
+
+
+def test_max_df_cap_is_an_absolute_ceiling_on_top_of_the_ratio() -> None:
+    # Ratio 1.0 alone keeps every entity; a cap of 2 drops A (df=3) exactly
+    # like the ratio-0.5 guard does - the lower ceiling wins.
+    capped = build_entity_edges(
+        CORPUS, config=EntityEdgeConfig(max_df_ratio=1.0, max_df_cap=2)
+    )
+    by_ratio = build_entity_edges(CORPUS, config=EntityEdgeConfig(max_df_ratio=0.5))
+    assert capped == by_ratio
+
+
+def test_max_df_cap_does_not_grow_with_the_corpus() -> None:
+    # One entity in 50 of 1000 chunks: the ratio ceiling (0.1 * 1000 = 100)
+    # keeps its 1225-pair clique, a cap of 40 drops it whatever n is.
+    corpus = {f"c{i}": (["hub"] if i < 50 else []) for i in range(1000)}
+    assert len(build_entity_edges(corpus, EntityEdgeConfig(max_df_ratio=0.1))) == 1225
+    assert (
+        build_entity_edges(corpus, EntityEdgeConfig(max_df_ratio=0.1, max_df_cap=40))
+        == []
+    )
+
+
+def test_max_df_cap_default_is_the_measured_winner_and_floored_at_two() -> None:
+    # 2026-10-03, pre-registered: cap 100 halved the sealed entity layers with
+    # S@5 moving by at most +.0003; None remains the way to switch it off.
+    assert EntityEdgeConfig().max_df_cap == 100
+    with pytest.raises(ValueError, match="max_df_cap"):
+        EntityEdgeConfig(max_df_cap=1)

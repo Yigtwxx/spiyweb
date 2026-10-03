@@ -151,13 +151,27 @@ class EntityEdgeConfig:
             ratio every corpus under 100 chunks got an EMPTY entity layer,
             silently, until 2026-08-26. The floor cannot move a measured
             number: the smallest sealed index holds 3336 chunks.
+        max_df_cap: Absolute ceiling on the same document frequency, applied
+            on top of the ratio (the lower of the two wins, never below 2);
+            `None` leaves the ratio alone. With the ratio alone the ceiling
+            grows with the corpus, so the entity layer grows QUADRATICALLY:
+            measured 2026-10-03 on 39,452 pooled passages, 108k edges at 5k
+            chunks and 6.7M at 39k, ~43M projected at 100k. The default 100
+            is the pre-registered winner: it cuts the pooled layer to 1.03M
+            edges (-85%) and the sealed MuSiQue/HotpotQA layers by about half,
+            while S@5 moved by +.0003 on MuSiQue seed 42 and exactly 0 on
+            HotpotQA, 2Wiki and the seed-123 holdout - the dropped cliques
+            carried no retrieval signal.
     """
 
     max_df_ratio: float = 0.02
+    max_df_cap: int | None = 100
 
     def __post_init__(self) -> None:
         if not 0.0 < self.max_df_ratio <= 1.0:
             raise ValueError("max_df_ratio must lie in (0, 1]")
+        if self.max_df_cap is not None and self.max_df_cap < 2:
+            raise ValueError("max_df_cap must be at least 2 (or None)")
 
 
 @dataclass(frozen=True)

@@ -81,6 +81,8 @@ def build_entity_edges(
             mentions.setdefault(entity, set()).add(chunk_id)
 
     max_df = max(_MIN_DF_CEILING, cfg.max_df_ratio * len(entities))
+    if cfg.max_df_cap is not None:
+        max_df = min(max_df, float(cfg.max_df_cap))
     weights: dict[tuple[str, str], float] = {}
     for entity in sorted(mentions):
         chunk_ids = mentions[entity]

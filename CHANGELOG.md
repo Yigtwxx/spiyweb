@@ -27,6 +27,20 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ## [Unreleased]
 
+### Changed
+
+- `EntityEdgeConfig.max_df_cap` (new, default `100`): an absolute ceiling on
+  an entity's document frequency on top of `max_df_ratio`. With the ratio
+  alone the ceiling grew with the corpus and the entity layer grew
+  quadratically - 6.7M edges on 39,452 pooled passages, ~43M projected at
+  100k. With the cap: 1.03M (-85%). Measured, pre-registered: the sealed
+  entity layers shrink by about half (MuSiQue 633k → 309k, HotpotQA
+  451k → 214k, 2Wiki 135k → 119k) while S@5 moves by +.0003 on MuSiQue
+  seed 42 and exactly 0 on HotpotQA, 2Wiki and the seed-123 holdout.
+  An index built by this release therefore has fewer entity edges than one
+  built by 0.2.4 from the same corpus; `max_df_cap=None` restores the old
+  layer.
+
 ### Added
 
 - `ColoredRetrievalConfig.question_color_width` (default `0`, off) and a
