@@ -27,6 +27,15 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.3] - 2026-10-03
+
+The proposition layer reaches the command line, and votes count what they
+always claimed to: distinct sources. A patch rather than a minor bump by
+the owner's choice - the result types only gain fields, and no declared
+name moved.
+
 ### Added
 
 - `spiyweb index --propositions` builds the proposition layer from the
