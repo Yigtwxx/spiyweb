@@ -29,6 +29,71 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 Nothing yet.
 
+## [0.2.4] - 2026-10-03
+
+The monitor becomes the whole interface: from a bare `spiyweb`, someone
+who has never read the docs can watch a demo, install what is missing,
+build an index, ask it, open a passage and compare the web with `top-k` -
+without typing a subcommand. The public API is unchanged: no declared name
+moved, and every addition is internal (`spiyweb.__main__`,
+`spiyweb.progress`, `spiyweb.nearby`, `spiyweb.results`, `demo.jsonl`,
+`spiyweb.thermal.residue_of`).
+
+### Added
+
+- `/demo` replays three questions recorded with the real pipeline on a
+  sample corpus (`examples/make_demo.py` regenerates them), with no
+  dependency at all - the first thing to try on a bare install.
+- `/doctor`: extras, the spaCy model, the LLM server and the device, each
+  missing piece next to the command that fixes it.
+- A guided `/index`: a folder list with file counts, then the options
+  (output folder, proposition layer, rebuild, one passage per file, glob)
+  toggled like `/config`.
+- `/indexes` lists the indexes nearby; the chosen one is remembered across
+  sessions and named in the status bar with the profile.
+- `/show [n]` opens a passage in full - text, source, hop, votes, the copies
+  folded into it, and the path the energy took.
+- `/compare <question>` runs plain `top-k` at the same `k` beside the web
+  and lists what only one of them found.
+- `/tune` changes damping, threshold and seed width for the session and asks
+  the last question again; `/config` gains warm follow-ups (the thermal
+  residue, off by default) and `/reset` cools them.
+- `/save [file]` writes the query on screen as Markdown.
+- Under every played query: numbered passages, and - only when the run
+  produced them - contradictions, disputed claims, unbridged themes, and
+  the structural refusal when the web never left the seeds.
+- A one-line hint on the input box until the first message; tab completes
+  folders after a command; history survives restarts (lines starting with
+  `!` are never written down); quoted paths with spaces.
+- `python -m spiyweb`, the same command as `spiyweb`.
+
+### Changed
+
+- `/index`, `/lint` and `/install` run as background jobs, their stage,
+  elapsed time and progress bar in the status line, the terminal bell when
+  a long one ends. `/install index` also fetches the spaCy model.
+- `/install` without an argument is the `/doctor` view. `/version` and
+  `/menu` left the monitor - the welcome box shows the version and the
+  `/index` form replaces the menu; `spiyweb version` and `spiyweb menu`
+  stay.
+- One embedding model is shared by every index that names the default one,
+  instead of a copy per opened index.
+- Ranking and map labels drop the folder and the text extension and keep
+  the passage position (`notes/a.md:3` reads `a:3`); a crowded map draws
+  each label whole or not at all, strongest first.
+- `spiyweb index` says when it loads the embedding model.
+
+### Fixed
+
+- A single ctrl-c quit the monitor in a real terminal; it now clears the
+  line, and two inside a second leave, as documented. ctrl-c no longer
+  reaches background jobs.
+- A failing command (an exception, an argparse exit) ended the monitor; it
+  is now reported under the prompt.
+- A rebuilt index was answered from the copy already in memory.
+- Library warnings were printed over the full-screen frame.
+- The ASCII glyph set printed a unicode ellipsis in labels.
+
 ## [0.2.3] - 2026-10-03
 
 The proposition layer reaches the command line, and votes count what they
