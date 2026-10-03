@@ -64,8 +64,14 @@ def _logged(function: object, name: str) -> list[str]:
 
 
 def test_every_line_build_index_logs_is_recognised_as_a_stage() -> None:
-    lines = _logged(indexing.build_index, "log")
-    assert len(lines) >= 15, "the AST walk found the log calls"
+    # The entity stage logs from a helper build_index and sync_index share,
+    # and sync_index logs its own lines - all of them reach the same monitor.
+    lines = [
+        *_logged(indexing.build_index, "log"),
+        *_logged(indexing._extract_with_fallback, "log"),
+        *_logged(indexing.sync_index, "log"),
+    ]
+    assert len(lines) >= 20, "the AST walk found the log calls"
     unknown = [line for line in lines if classify(line) is None]
     assert unknown == [], f"add a rule in progress.RULES for: {unknown}"
 

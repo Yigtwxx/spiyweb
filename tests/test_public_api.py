@@ -154,6 +154,7 @@ INDEX_TIME_API = frozenset(
         "EntityPipeline",
         "IndexLayout",
         "IndexManifest",
+        "IndexSync",
         "LLMClient",
         "LLMError",
         "NativeOllamaClient",
@@ -182,6 +183,7 @@ INDEX_TIME_API = frozenset(
         "read_manifest",
         "resolve_device",
         "shared_subject_pairs",
+        "sync_index",
     }
 )
 """The index-time contract, on the same terms. A literal rather than a

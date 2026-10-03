@@ -36,6 +36,9 @@ EDGE_LAYERS = ("semantic", "entity", "structural", "derivation")
 _LAYERS = "|".join(EDGE_LAYERS)
 RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"^\d+ document\(s\), \d+ unit\(s\) -> "), "read"),
+    (re.compile(r"^sync: \d+ chunks reused"), "read"),
+    (re.compile(r"^no previous index here"), "read"),
+    (re.compile(r"^propositions=False: "), "propositions"),
     (re.compile(r"^extracting propositions: "), "propositions"),
     (re.compile(r"^propositions exist, skipping"), "propositions"),
     (re.compile(r"^proposition layer: "), "propositions"),
@@ -48,6 +51,7 @@ RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(rf"^({_LAYERS}) edges exist, skipping"), "edges"),
     (re.compile(rf"^({_LAYERS}) layer: \d+ edges"), "edges"),
     (re.compile(r"^nli "), "nli"),
+    (re.compile(r"^no nli_model given: "), "nli"),
     (re.compile(r"^done: "), "done"),
 )
 """Line pattern -> stage. `model` (loading the embedder) is a pause with a

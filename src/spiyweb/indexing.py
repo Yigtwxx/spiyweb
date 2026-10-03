@@ -116,6 +116,7 @@ __all__ = [
     "EntityPipeline",
     "IndexLayout",
     "IndexManifest",
+    "IndexSync",
     "LLMClient",
     "LLMError",
     "NativeOllamaClient",
@@ -147,6 +148,7 @@ __all__ = [
     "read_manifest",
     "resolve_device",
     "shared_subject_pairs",
+    "sync_index",
 ]
 
 
@@ -269,6 +271,52 @@ def _load_vectors(layout: IndexLayout) -> tuple[list[str], list[list[float]]]:
     return ids, vectors
 
 
+def _chunk_texts(
+    chunks: Sequence[Chunk], texts: Mapping[str, str] | None
+) -> dict[str, str]:
+    """What each chunk is embedded and extracted AS; mis-keyed overrides fail."""
+    known = {chunk.node.id for chunk in chunks}
+    supplied = dict(texts) if texts is not None else {}
+    unknown = sorted(key for key in supplied if key not in known)
+    if unknown:
+        raise ValueError(
+            f"`texts` names {len(unknown)} chunk id(s) this corpus does not "
+            f"contain, first {unknown[:3]}; keys are `{{source_id}}:{{position}}`"
+        )
+    return {chunk.node.id: supplied.get(chunk.node.id, chunk.text) for chunk in chunks}
+
+
+def _extract_with_fallback(
+    texts: Mapping[str, str],
+    entity_pipeline: EntityPipeline,
+    extraction_cfg: EntityExtractionConfig,
+    llm: LLMClient | None,
+    entity_llm: bool,
+    log: Callable[[str], None],
+) -> dict[str, list[str]]:
+    """spaCy for the bulk, the LLM for passages spaCy leaves under-tagged."""
+    log(f"extracting entities from {len(texts)} passages (spaCy bulk) ...")
+    entities = extract_entities(texts, entity_pipeline, extraction_cfg)
+    pending = {
+        chunk_id: texts[chunk_id]
+        for chunk_id, found in entities.items()
+        if len(found) < extraction_cfg.min_entities
+    }
+    # The count is logged BEFORE any LLM call: the cost must be visible
+    # up front, never discovered from a stalled progress bar.
+    fallback = llm is not None and entity_llm
+    log(
+        f"{len(pending)} of {len(texts)} passages fall below "
+        f"min_entities={extraction_cfg.min_entities}"
+        + (" and go to the LLM" if fallback else "; LLM fallback is OFF")
+    )
+    if fallback and pending:
+        entities.update(
+            extract_entities(pending, entity_pipeline, extraction_cfg, llm=llm)
+        )
+    return entities
+
+
 def build_index(
     documents: Sequence[DocumentInput],
     out_dir: IndexLayout | Path | str,
@@ -337,17 +385,7 @@ def build_index(
 
     chunks = chunk_documents(list(documents))
     ids = [chunk.node.id for chunk in chunks]
-    known = set(ids)
-    supplied = dict(texts) if texts is not None else {}
-    unknown = sorted(key for key in supplied if key not in known)
-    if unknown:
-        raise ValueError(
-            f"`texts` names {len(unknown)} chunk id(s) this corpus does not "
-            f"contain, first {unknown[:3]}; keys are `{{source_id}}:{{position}}`"
-        )
-    chunk_texts = {
-        chunk.node.id: supplied.get(chunk.node.id, chunk.text) for chunk in chunks
-    }
+    chunk_texts = _chunk_texts(chunks, texts)
 
     extracted: list[Proposition] = []
     if propositions:
@@ -423,26 +461,9 @@ def build_index(
         log("vectors exist, skipping the embed stage")
 
     if force or not layout.entities_json.exists():
-        log(f"extracting entities from {len(all_ids)} passages (spaCy bulk) ...")
-        entities = extract_entities(texts_all, entity_pipeline, extraction_cfg)
-        pending = {
-            chunk_id: texts_all[chunk_id]
-            for chunk_id, found in entities.items()
-            if len(found) < extraction_cfg.min_entities
-        }
-        # The count is logged BEFORE any LLM call: the cost must be visible
-        # up front, never discovered from a stalled progress bar.
-        fallback = llm is not None and entity_llm
-        log(
-            f"{len(pending)} of {len(all_ids)} passages fall below "
-            f"min_entities={extraction_cfg.min_entities}"
-            + (" and go to the LLM" if fallback else "; LLM fallback is OFF")
+        entities = _extract_with_fallback(
+            texts_all, entity_pipeline, extraction_cfg, llm, entity_llm, log
         )
-        if fallback and pending:
-            refreshed = extract_entities(
-                pending, entity_pipeline, extraction_cfg, llm=llm
-            )
-            entities.update(refreshed)
         _write_json(layout.entities_json, entities)
     else:
         log("entities exist, skipping the extraction stage")
@@ -610,6 +631,265 @@ def build_index(
         embedding_model=embedding_model,
         edges=dict(edge_counts),
         nli_edges=nli_edge_count,
+    )
+
+
+@dataclass(frozen=True)
+class IndexSync:
+    """What `sync_index` did: how many chunks it reused, embedded or dropped.
+
+    Attributes:
+        manifest: The receipt of the synced index, exactly as `build_index`
+            would have returned it for the same corpus.
+        reused: Chunks whose text was unchanged - their vectors, entities and
+            propositions were taken from the previous index.
+        added: Chunks the previous index did not have.
+        changed: Chunks whose indexed text differs from the previous index.
+        removed: Chunks of the previous index the corpus no longer contains.
+    """
+
+    manifest: IndexManifest
+    reused: int
+    added: int
+    changed: int
+    removed: int
+
+
+def sync_index(
+    documents: Sequence[DocumentInput],
+    out_dir: IndexLayout | Path | str,
+    *,
+    embedder: Embedder,
+    entity_pipeline: EntityPipeline,
+    texts: Mapping[str, str] | None = None,
+    llm: LLMClient | None = None,
+    embedding_model: str | None = None,
+    extraction_config: EntityExtractionConfig | None = None,
+    semantic_config: SemanticEdgeConfig | None = None,
+    structural_config: StructuralEdgeConfig | None = None,
+    entity_config: EntityEdgeConfig | None = None,
+    llm_model: str | None = None,
+    entity_llm: bool = True,
+    propositions: bool = False,
+    proposition_config: PropositionConfig | None = None,
+    nli_model: NLIModel | None = None,
+    nli_model_name: str | None = None,
+    nli_config: NLIEdgeConfig | None = None,
+    nli_candidates: NLICandidateConfig | None = None,
+    extra_meta: Mapping[str, object] | None = None,
+    log: Callable[[str], None] = print,
+) -> IndexSync:
+    """Bring an existing index in line with the corpus `documents` describe.
+
+    Declarative: pass the WHOLE current corpus, not a delta. Chunks whose
+    indexed text is unchanged keep their vectors, entities and propositions;
+    only new or changed chunks pay for embedding, entity extraction and
+    proposition extraction - the stages that cost GPU time or LLM calls.
+    Chunks the corpus no longer contains are dropped.
+
+    Every DERIVED layer is then rebuilt from scratch: semantic neighbours
+    move when the corpus moves, and an entity edge's weight depends on how
+    many chunks mention the entity, so patching them in place would be a
+    second, subtly different algorithm. Rebuilding them is cheap (seconds at
+    tens of thousands of chunks) and makes the guarantee simple: a synced
+    index is artifact-for-artifact the index `build_index` would write for
+    the same corpus. Contradiction edges are recomputed only when
+    `nli_model` is given; otherwise a stale `edges_nli.json` is removed and
+    the removal is logged, never silently kept.
+
+    Refuses, rather than mixes, when the embedding model or the entity
+    extraction settings differ from the ones the index was built with -
+    reused vectors and entities would then come from a different pipeline.
+    A directory without an index is simply built.
+    """
+    from spiyweb.store import VectorStore
+
+    layout = IndexLayout.at(out_dir)
+    build_kwargs: dict[str, object] = {
+        "embedder": embedder,
+        "entity_pipeline": entity_pipeline,
+        "texts": texts,
+        "llm": llm,
+        "embedding_model": embedding_model,
+        "extraction_config": extraction_config,
+        "semantic_config": semantic_config,
+        "structural_config": structural_config,
+        "entity_config": entity_config,
+        "llm_model": llm_model,
+        "entity_llm": entity_llm,
+        "propositions": propositions,
+        "proposition_config": proposition_config,
+        "nli_model": nli_model,
+        "nli_model_name": nli_model_name,
+        "nli_config": nli_config,
+        "nli_candidates": nli_candidates,
+        "extra_meta": extra_meta,
+        "log": log,
+    }
+    chunks = chunk_documents(list(documents))
+    chunk_texts = _chunk_texts(chunks, texts)
+    per_chunk = (
+        layout.texts_json,
+        layout.nodes_json,
+        layout.vectors_npz,
+        layout.entities_json,
+    )
+    if not all(path.exists() for path in per_chunk):
+        log("no previous index here - building from scratch")
+        manifest = build_index(documents, layout, **build_kwargs)  # type: ignore[arg-type]
+        return IndexSync(manifest, reused=0, added=len(chunks), changed=0, removed=0)
+
+    extraction_cfg = (
+        extraction_config if extraction_config is not None else EntityExtractionConfig()
+    )
+    old_store = VectorStore.load(layout.vectors_npz)
+    stored_model = old_store.model_name
+    if stored_model and embedding_model and stored_model != embedding_model:
+        raise ValueError(
+            f"this index was built with embedding model {stored_model!r}, "
+            f"not {embedding_model!r}; reused vectors would live in another "
+            "space - rebuild it with build_index(force=True)"
+        )
+    meta = _read_json(layout.meta_json) if layout.meta_json.exists() else {}
+    recorded = meta.get("extraction_config") if isinstance(meta, dict) else None
+    current = {**asdict(extraction_cfg), "labels": sorted(extraction_cfg.labels)}
+    if recorded is not None and recorded != current:
+        raise ValueError(
+            "the entity extraction settings differ from the ones this index "
+            "was built with; reused entities would be inconsistent - rebuild "
+            "it with build_index(force=True)"
+        )
+
+    old_texts = _read_json(layout.texts_json)
+    if not isinstance(old_texts, dict):
+        raise ValueError(f"{str(layout.texts_json)!r} is not a text map")
+    fresh = [c for c in chunks if old_texts.get(c.node.id) != chunk_texts[c.node.id]]
+    fresh_ids = {chunk.node.id for chunk in fresh}
+    current_ids = {chunk.node.id for chunk in chunks}
+    added = sum(1 for chunk_id in fresh_ids if chunk_id not in old_texts)
+    removed = sum(1 for chunk_id in old_texts if chunk_id not in current_ids)
+    reused_chunks = len(chunks) - len(fresh)
+    log(
+        f"sync: {reused_chunks} chunks reused, {added} added, "
+        f"{len(fresh) - added} changed, {removed} removed"
+    )
+
+    previous_props = (
+        load_propositions(layout) if layout.propositions_json.exists() else []
+    )
+    extracted: list[Proposition] = []
+    if propositions:
+        # A layer the old index did not have needs every chunk; otherwise
+        # only the fresh ones are extracted again.
+        redo = list(chunks) if not previous_props else list(fresh)
+        if redo and llm is None:
+            raise ValueError("proposition extraction requires an LLM client")
+        new_props: list[Proposition] = []
+        if redo:
+            log(f"extracting propositions: {len(redo)} passages, one LLM call each ...")
+            new_props = extract_propositions(
+                redo,
+                llm,  # type: ignore[arg-type]
+                proposition_config,
+                texts=chunk_texts,
+            )
+        redo_ids = {chunk.node.id for chunk in redo}
+        by_chunk: dict[str, list[Proposition]] = {}
+        for prop in previous_props:
+            if prop.chunk_id not in redo_ids and prop.chunk_id in current_ids:
+                by_chunk.setdefault(prop.chunk_id, []).append(prop)
+        for prop in new_props:
+            by_chunk.setdefault(prop.chunk_id, []).append(prop)
+        extracted = [p for chunk in chunks for p in by_chunk.get(chunk.node.id, [])]
+        _write_json(
+            layout.propositions_json,
+            [
+                {
+                    "id": p.node.id,
+                    "chunk_id": p.chunk_id,
+                    "source_id": p.node.source_id,
+                    "length": p.node.length,
+                    "timestamp": p.node.timestamp,
+                    "polarity": p.node.polarity,
+                    "text": p.text,
+                }
+                for p in extracted
+            ],
+        )
+    elif layout.propositions_json.exists():
+        layout.propositions_json.unlink()
+        log("propositions=False: the old proposition layer was removed")
+
+    all_nodes = [chunk.node for chunk in chunks] + [p.node for p in extracted]
+    all_ids = [node.id for node in all_nodes]
+    texts_all = {**chunk_texts, **{p.node.id: p.text for p in extracted}}
+    old_ids, old_vectors = _load_vectors(layout)
+    vector_of = dict(zip(old_ids, old_vectors, strict=True))
+    old_entities = load_entities(layout)
+    old_prop_texts = {p.node.id: p.text for p in previous_props}
+
+    def reusable(node_id: str) -> bool:
+        if node_id.split("#", 1)[0] in fresh_ids or node_id not in vector_of:
+            return False
+        if "#" in node_id:
+            return old_prop_texts.get(node_id) == texts_all[node_id]
+        return True
+
+    keep = [node_id for node_id in all_ids if reusable(node_id)]
+    redo_nodes = [node_id for node_id in all_ids if not reusable(node_id)]
+    log(f"embedding {len(redo_nodes)} passages (reusing {len(keep)}) ...")
+    if redo_nodes:
+        embedded = embedder.embed_passages([texts_all[i] for i in redo_nodes])
+        vector_of.update(zip(redo_nodes, embedded, strict=True))
+    vectors = [vector_of[node_id] for node_id in all_ids]
+    store = VectorStore(len(vectors[0]))
+    store.add(all_ids, vectors)
+    store.save(
+        layout.vectors_npz,
+        model_name=embedding_model if embedding_model else stored_model,
+    )
+
+    entities = {i: old_entities[i] for i in keep if i in old_entities}
+    missing = {i: texts_all[i] for i in all_ids if i not in entities}
+    if missing:
+        entities.update(
+            _extract_with_fallback(
+                missing, entity_pipeline, extraction_cfg, llm, entity_llm, log
+            )
+        )
+    _write_json(layout.entities_json, {i: entities[i] for i in all_ids})
+    _write_json(layout.texts_json, chunk_texts)
+    _write_json(
+        layout.nodes_json,
+        [
+            {
+                "id": node.id,
+                "layer": node.layer,
+                "source_id": node.source_id,
+                "length": node.length,
+                "timestamp": node.timestamp,
+                "cluster_id": node.cluster_id,
+                "polarity": node.polarity,
+            }
+            for node in all_nodes
+        ],
+    )
+
+    # Derived layers: removed here, rebuilt by build_index below.
+    for layer in _EDGE_LAYER_FILES:
+        layout.edges_json(layer).unlink(missing_ok=True)
+    if layout.nli_json.exists():
+        layout.nli_json.unlink()
+        if nli_model is None:
+            log("no nli_model given: stale contradiction edges were removed")
+    layout.meta_json.unlink(missing_ok=True)
+    manifest = build_index(documents, layout, **build_kwargs)  # type: ignore[arg-type]
+    return IndexSync(
+        manifest,
+        reused=reused_chunks,
+        added=added,
+        changed=len(fresh) - added,
+        removed=removed,
     )
 
 
