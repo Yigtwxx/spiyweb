@@ -27,7 +27,20 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `ColoredRetrievalConfig.question_color_width` (default `0`, off) and a
+  `question=` argument on `retrieve_colored()` and
+  `SpiywebIndex.retrieve_colored()`: the undivided question can seed one more
+  colour beside its decomposed parts, under the same equal energy share, and
+  it never counts towards a bridge. It is shipped **off** because it was
+  measured and lost: on the sealed MuSiQue tuning set width 2 moved S@5 by
+  −.0072 CI [−.0136, −.0010] (HotpotQA +.0092, 2Wiki −.0022 n.s.), so no
+  retrieval number changes with this release.
+- `EmbeddingConfig.query_prefix` / `passage_prefix`: the role prefixes are
+  now configuration instead of being fixed to e5's, so another embedding
+  family can be used with its own prompt format. The defaults are e5's
+  `"query: "` / `"passage: "`, so existing indexes embed exactly as before.
 
 ## [0.2.4] - 2026-10-03
 

@@ -1250,6 +1250,17 @@ class ColoredRetrievalConfig:
             seed width of 2 a single duplicated passage captures BOTH slots
             of a colour, so the refill matters most here. `1` disables it;
             inert while dedup is off.
+        question_color_width: Seed width of the QUESTION colour; `0` (the
+            default) switches the mechanism off. When positive and the caller
+            passes the undivided question's embedding, the whole question
+            seeds one more colour beside the decomposed parts, under the same
+            equal energy share. Diagnosed 2026-10-03 on the sealed runs: of
+            the gold passages the dense top-5 found and the web dropped, over
+            95% were no colour's contact at all - decomposing the question
+            had thrown away its whole-question similarity, and the spread
+            almost never reached those passages from elsewhere. The question
+            colour never makes a bridge: meeting a part is not two parts
+            meeting. Off until gate round #6 measures it.
     """
 
     seed_width: int = 2
@@ -1260,10 +1271,13 @@ class ColoredRetrievalConfig:
     decomposition_no_think: bool = True
     max_answer_words: int = 10
     contact_overfetch: int = 3
+    question_color_width: int = 0
 
     def __post_init__(self) -> None:
         if self.seed_width < 1:
             raise ValueError("seed_width must be at least 1")
+        if self.question_color_width < 0:
+            raise ValueError("question_color_width must be non-negative")
         if self.contact_overfetch < 1:
             raise ValueError("contact_overfetch must be at least 1")
         if self.max_colors < 1:

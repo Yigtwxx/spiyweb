@@ -218,3 +218,134 @@ def test_colored_config_rejects_non_positive_counts(
 ) -> None:
     with pytest.raises(ValueError, match=field_name):
         ColoredRetrievalConfig(**{field_name: value})
+
+
+# --- the question colour (question_color_width, gate round #6) -------------
+
+QUESTION = (0.6, 0.8)
+
+
+def make_question_index() -> RoutedSeedSource:
+    return RoutedSeedSource(
+        {
+            QUERY_A: [("a", 0.9)],
+            QUERY_B: [("b", 0.7)],
+            QUESTION: [("x", 0.8), ("a", 0.6), ("b", 0.5)],
+        }
+    )
+
+
+def test_the_question_colour_is_off_by_default_and_ignored() -> None:
+    graph = make_graph()
+    plain = retrieve_colored(
+        {"c0": QUERY_A, "c1": QUERY_B}, make_question_index(), graph, CONFIG
+    )
+    given = retrieve_colored(
+        {"c0": QUERY_A, "c1": QUERY_B},
+        make_question_index(),
+        graph,
+        CONFIG,
+        question=QUESTION,
+    )
+
+    assert CONFIG.question_color_width == 0
+    assert given.ranked() == plain.ranked(), (
+        "with the width at 0 a passed question must change nothing - one "
+        "call site has to serve both sides of the ablation"
+    )
+    assert set(given.seeds_by_color) == {"c0", "c1"}
+
+
+def test_the_question_colour_equals_a_hand_called_extra_context_colour() -> None:
+    graph = make_graph()
+    config = ColoredRetrievalConfig(
+        propagation=CONFIG.propagation, question_color_width=2
+    )
+    index = make_question_index()
+    result = retrieve_colored(
+        {"c0": QUERY_A, "c1": QUERY_B}, index, graph, config, question=QUESTION
+    )
+    by_hand = propagate_colored(
+        graph,
+        {"c0": {"a": 0.9}, "c1": {"b": 0.7}, "question": {"x": 0.8, "a": 0.6}},
+        config.propagation,
+        context_colors=("question",),
+    )
+
+    assert result.ranked() == by_hand.ranked(), (
+        "the question colour is one more colour under the equal share, "
+        "seeded with its own top question_color_width contacts"
+    )
+    assert index.calls[-1] == (QUESTION, 2), "the question uses its own width"
+    assert list(result.seeds_by_color)[-1] == "question", (
+        "the question colour comes after the parts - the first colour stays "
+        "the primary one"
+    )
+
+
+def test_the_question_colour_never_makes_a_bridge() -> None:
+    config = ColoredRetrievalConfig(
+        propagation=CONFIG.propagation, question_color_width=1
+    )
+    # Only c0 and the question: they meet at a and x, but that is one part
+    # meeting the whole question, not two parts meeting.
+    result = retrieve_colored(
+        {"c0": QUERY_A}, make_question_index(), make_graph(), config, question=QUESTION
+    )
+
+    assert "question" in result.seeds_by_color
+    assert result.bridges == {}, "a bridge needs two PARTS of the query"
+
+
+def test_bridges_between_parts_survive_the_question_colour() -> None:
+    config = ColoredRetrievalConfig(
+        propagation=CONFIG.propagation, question_color_width=2
+    )
+    result = retrieve_colored(
+        {"c0": QUERY_A, "c1": QUERY_B},
+        make_question_index(),
+        make_graph(),
+        config,
+        question=QUESTION,
+    )
+
+    assert result.bridges["x"] == ("c0", "c1"), (
+        "the question colour reaching x must not appear among x's colours"
+    )
+
+
+def test_the_question_width_without_a_question_is_a_hard_error() -> None:
+    config = ColoredRetrievalConfig(question_color_width=2)
+    with pytest.raises(ValueError, match="no question embedding"):
+        retrieve_colored({"c0": QUERY_A}, make_question_index(), make_graph(), config)
+
+
+def test_the_question_label_is_reserved_while_the_mechanism_runs() -> None:
+    config = ColoredRetrievalConfig(question_color_width=2)
+    with pytest.raises(ValueError, match="reserved"):
+        retrieve_colored(
+            {"c0": QUERY_A, "question": QUERY_B},
+            make_question_index(),
+            make_graph(),
+            config,
+            question=QUESTION,
+        )
+
+
+def test_a_question_without_positive_contact_is_skipped() -> None:
+    index = RoutedSeedSource(
+        {QUERY_A: [("a", 0.9)], QUESTION: [("dead", 0.0), ("anti", -0.2)]}
+    )
+    config = ColoredRetrievalConfig(
+        propagation=CONFIG.propagation, question_color_width=2
+    )
+    result = retrieve_colored(
+        {"c0": QUERY_A}, index, make_graph(), config, question=QUESTION
+    )
+
+    assert set(result.seeds_by_color) == {"c0"}
+
+
+def test_colored_config_rejects_a_negative_question_width() -> None:
+    with pytest.raises(ValueError, match="question_color_width"):
+        ColoredRetrievalConfig(question_color_width=-1)

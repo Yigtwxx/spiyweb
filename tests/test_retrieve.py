@@ -486,3 +486,26 @@ def test_a_source_supporting_at_contact_and_in_the_web_votes_once() -> None:
         contact_supporters={"doc": frozenset({"other"})},
     )
     assert result.votes() == {"doc": 2}
+
+
+def test_the_question_colour_runs_the_same_contact_dedup() -> None:
+    from spiyweb import ColoredRetrievalConfig, DedupConfig, retrieve_colored
+
+    index = FakeSeedSource(DUP_CONTACTS)
+    result = retrieve_colored(
+        {"c0": [1.0, 0.0]},
+        index,
+        make_graph(),
+        ColoredRetrievalConfig(
+            seed_width=2, contact_overfetch=2, question_color_width=2
+        ),
+        similarity=_twin_similarity,
+        dedup=DedupConfig(floor=0.90, min_pairs=100),
+        question=[0.0, 1.0],
+    )
+    assert index.calls[-1] == ((0.0, 1.0), 4), "its own width, overfetched"
+    assert result.seeds_by_color["question"] == {"a": 0.9, "c": 0.7}
+    assert result.contact_suppressed["question"] == {"a_dup": "a"}
+    assert result.votes()["a"] == 2, (
+        "the same twin found by two colours is still ONE supporting source"
+    )

@@ -528,6 +528,10 @@ def _absorbing_field(
     return negative_field(graph, merged, propagation, cfg.energy_ratio), cfg
 
 
+QUESTION_COLOR = "question"
+"""Label of the undivided question's colour (`question_color_width`)."""
+
+
 @dataclass(frozen=True)
 class ColoredRetrievalResult:
     """What one `retrieve_colored()` call returns - as partial as
@@ -637,6 +641,7 @@ def retrieve_colored(
     negative_queries: Sequence[Sequence[float]] | None = None,
     negative_seed: NegativeSeedConfig | None = None,
     polarity: PolarityConfig | None = None,
+    question: Sequence[float] | None = None,
 ) -> ColoredRetrievalResult:
     """Inject one coloured seed set per query part and return the merged web.
 
@@ -652,11 +657,30 @@ def retrieve_colored(
     a raw-contact fallback here instead; it never fired in 1000 questions, and
     it could only ever have crashed inside the core - all-non-positive seed
     weights cannot be split - so the library states the error properly.)
+
+    `question` is the undivided question's embedding. With
+    `config.question_color_width > 0` it seeds one more colour,
+    `QUESTION_COLOR`, AFTER the parts: same equal energy share, its own
+    contact width, never a bridge. Without the width it is ignored, so one
+    call site serves both sides of the ablation. The width without a
+    question is an error - a switched-on mechanism must not quietly not run.
     """
     if not colored_queries:
         raise ValueError("at least one coloured query is required")
     cfg = config if config is not None else ColoredRetrievalConfig()
     _check_dedup_contract(similarity, dedup)
+    question_width = cfg.question_color_width
+    if question_width > 0:
+        if question is None:
+            raise ValueError(
+                "question_color_width is set but no question embedding was "
+                "given - pass question= or set the width to 0"
+            )
+        if QUESTION_COLOR in colored_queries:
+            raise ValueError(
+                f"colour label {QUESTION_COLOR!r} is reserved for the "
+                "question colour while question_color_width is set"
+            )
 
     depth = _contact_depth(cfg.seed_width, cfg.contact_overfetch, similarity, dedup)
     source_key = _source_key(graph, source_of)
@@ -690,6 +714,29 @@ def retrieve_colored(
         if tau_here is not None:
             contact_taus[color] = tau_here
 
+    context_colors: tuple[str, ...] = ()
+    if question_width > 0 and question is not None:
+        contacts = index.search(
+            question,
+            _contact_depth(question_width, cfg.contact_overfetch, similarity, dedup),
+        )
+        seeds, suppressed_here, tau_here = _select_contacts(
+            contacts, question_width, similarity, dedup, source_key
+        )
+        # Skipped when it touches nothing, like any later colour: the parts
+        # already carry the query, so this colour can only add, never be
+        # the reason a call fails.
+        if seeds:
+            seeds_by_color[QUESTION_COLOR] = seeds
+            context_colors = (QUESTION_COLOR,)
+            if suppressed_here:
+                contact_suppressed[QUESTION_COLOR] = suppressed_here
+                contact_support.append(
+                    _contact_supporters(suppressed_here, source_of, source_key)
+                )
+            if tau_here is not None:
+                contact_taus[QUESTION_COLOR] = tau_here
+
     # Every colour injects the full seed energy and splits it among ITS own
     # contacts, so the check runs per colour - `seeds` here is whatever the
     # last iteration happened to leave behind, which is the wrong colour as
@@ -714,6 +761,7 @@ def retrieve_colored(
         absorb=absorb,
         negative_seed=negative_cfg,
         polarity=polarity,
+        context_colors=context_colors,
     )
     contact_supporters = merge_support(*contact_support)
     return ColoredRetrievalResult(
