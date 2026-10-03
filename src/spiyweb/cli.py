@@ -230,6 +230,9 @@ def _index(args: argparse.Namespace) -> int:
     print(f"{len(documents)} document(s), {units} unit(s) -> {args.out}")
 
     llm, llm_model = _proposition_llm(args) if args.propositions else (None, None)
+    # Seconds on a warm cache, minutes on the first download: said up front so
+    # the pause has a name (the monitor's progress reads this line too).
+    print("loading the embedding model ...", flush=True)
     embedder = SentenceTransformerEmbedder()
     try:
         pipeline = load_spacy_pipeline()
@@ -522,7 +525,9 @@ def _progress(message: str) -> None:
 
 
 def _is_index(path: Path) -> bool:
-    return path.is_dir() and (path / "nodes.json").is_file()
+    from spiyweb.nearby import is_index
+
+    return is_index(path)
 
 
 def _open(path: Path | str, **options: object) -> SpiywebIndex:
@@ -554,10 +559,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--version", action="version", version=f"spiyweb {__version__}")
-    # Not `required=True`: a bare `spiyweb` opens the guided menu instead of
+    # Not `required=True`: a bare `spiyweb` opens the live monitor instead of
     # printing a usage error at someone who has not learned the verbs yet.
-    # `main` handles the empty case, and refuses to prompt when nobody is
-    # there to answer.
+    # `main` handles the empty case, and refuses to take the screen when
+    # nobody is there to look at it.
     subs = parser.add_subparsers(dest="command")
 
     version = subs.add_parser("version", help="version and which extras are installed")

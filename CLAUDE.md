@@ -177,12 +177,17 @@ src/spiyweb/
 ├── terminal.py           # ANSI colour, bars, screen primitives; zero dependencies
 ├── keys.py               # raw keypresses with a timeout (msvcrt / termios), stdlib
 ├── watch.py              # bare `spiyweb`: the live monitor - marker, tail, loop, screen
-├── commands.py           # the monitor's `/` commands: query, lint, index, install, find, config
+├── commands.py           # the monitor's `/` commands: demo, doctor, index, show, compare, tune...
+├── progress.py           # a background job's stage and bar, read off the lines it prints
+├── nearby.py             # indexes, text folders and typed paths near the monitor; stdlib only
+├── results.py            # reading a played record: passages, detail, honesty lines, Markdown
+├── demo.jsonl            # `/demo`: three real recorded queries (examples/make_demo.py)
+├── __main__.py           # `python -m spiyweb`, how the monitor starts its background verbs
 ├── animate.py            # pure frames of one TraceRecord: ranking bars + ring map
 ├── pet.py                # the spider in the welcome box (braille silhouette, ASCII fallback)
 ├── banner.py             # the SPIYWEB wordmark heading the transcript (same mark as site/)
 ├── rings.py              # the hop-ring layout rule, numpy-free; scene.py re-exports it
-├── wizard.py             # `spiyweb menu` / `/menu`: the old guided menu, never in a pipe
+├── wizard.py             # `spiyweb menu`: the old guided menu, never in a pipe
 ├── store.py              # numpy + FAISS single-file vector store (outside core/)
 │                         #   + FAISS-backed twin of the semantic edge builder
 ├── output.py             # result structure, paths, clusters, confidence, conflicts

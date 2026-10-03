@@ -38,6 +38,22 @@ if TYPE_CHECKING:
     from spiyweb.core.propagate import PropagationResult
 
 
+def residue_of(
+    previous: PropagationResult | None, thermal: ThermalConfig
+) -> dict[str, float]:
+    """What a turn leaves warm for the next one: `residue_ratio` of each
+    activated node's energy. The one copy of the rule - `ThermalSession`
+    and the terminal monitor's warm follow-ups both read it here."""
+    if previous is None or not thermal.enabled:
+        return {}
+    ratio = thermal.residue_ratio
+    return {
+        node: activation.energy * ratio
+        for node, activation in previous.activations.items()
+        if activation.energy > 0.0
+    }
+
+
 class ThermalSession:
     """Multi-turn retrieval over one index and graph, with warm ground.
 
@@ -96,14 +112,7 @@ class ThermalSession:
 
     def residue(self) -> dict[str, float]:
         """The energy map the next turn would inject; empty when cold."""
-        if self._previous is None or not self._thermal.enabled:
-            return {}
-        ratio = self._thermal.residue_ratio
-        return {
-            node: activation.energy * ratio
-            for node, activation in self._previous.activations.items()
-            if activation.energy > 0.0
-        }
+        return residue_of(self._previous, self._thermal)
 
     def retrieve(
         self,

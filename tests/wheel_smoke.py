@@ -102,4 +102,13 @@ with tempfile.TemporaryDirectory() as folder:
     assert load_traces(written) == (record,), "the trace reader did not round-trip"
     assert load_traces(Path(folder)) == (record,), "a directory should resolve"
 
+# 8. `/demo` plays from the wheel itself: the recordings shipped (a file
+#    under a folder the .gitignore names would silently not have) and read
+#    back with nothing installed.
+from spiyweb.commands import demo_records  # noqa: E402
+
+demo = demo_records()
+assert len(demo) == 3 and all(r.nodes for r in demo), "demo.jsonl did not ship"
+assert "numpy" not in sys.modules, "playing the demo pulled numpy in"
+
 print(f"wheel smoke ok: spiyweb {spiyweb.__version__}, {len(spiyweb.__all__)} names")

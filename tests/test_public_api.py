@@ -28,7 +28,10 @@ import spiyweb.animate
 import spiyweb.commands
 import spiyweb.indexing
 import spiyweb.keys
+import spiyweb.nearby
 import spiyweb.pet
+import spiyweb.progress
+import spiyweb.results
 import spiyweb.rings
 import spiyweb.watch
 
@@ -307,12 +310,16 @@ import spiyweb.animate
 import spiyweb.commands
 import spiyweb.indexing
 import spiyweb.keys
+import spiyweb.nearby
 import spiyweb.pet
+import spiyweb.progress
+import spiyweb.results
 import spiyweb.rings
 import spiyweb.watch
 
 for attr in spiyweb.__all__:
     getattr(spiyweb, attr)
+assert len(spiyweb.commands.demo_records()) == 3, "the demo plays on a bare install"
 for attr in spiyweb.indexing.__all__:
     if attr in ("VectorStore", "build_semantic_edges_fast"):
         continue

@@ -23,6 +23,7 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from spiyweb.results import short_id
 from spiyweb.rings import hop_ring_layout, ring_radii
 from spiyweb.terminal import bar, clip, pad, paint, paint_hop, printed_width
 
@@ -70,6 +71,7 @@ class Glyphs:
     off: str
     pick: str
     unpick: str
+    ellipsis: str
 
     @classmethod
     def unicode(cls) -> Glyphs:
@@ -78,7 +80,7 @@ class Glyphs:
             arrow="←", to="→", times="×", prompt="›", dot="·", caret="▏",  # noqa: RUF001
             tl="╭", tr="╮", bl="╰", br="╯", h="─", v="│",
             bullet="⏺", tip="※", spin="✻✽✶✳✢·", live="●", off="○",
-            pick="●", unpick="○",
+            pick="●", unpick="○", ellipsis="…",
         )  # fmt: skip
 
     @classmethod
@@ -88,7 +90,7 @@ class Glyphs:
             arrow="<-", to="->", times="x", prompt=">", dot="-", caret="_",
             tl="+", tr="+", bl="+", br="+", h="-", v="|",
             bullet="*", tip="*", spin="-\\|/", live="*", off="o",
-            pick="*", unpick="o",
+            pick="*", unpick="o", ellipsis="...",
         )  # fmt: skip
 
 
@@ -141,8 +143,8 @@ def _converging(record: TraceRecord) -> dict[str, int]:
     return {p.node: p.converging for p in record.paths if p.converging > 0}
 
 
-def _label(text: str, chars: int) -> str:
-    return text if len(text) <= chars else text[: chars - 1] + "…"
+def _label(text: str, chars: int, glyphs: Glyphs) -> str:
+    return short_id(text, chars, glyphs.ellipsis)
 
 
 def ranking(record: TraceRecord, hop: int, t: float, style: Style) -> list[str]:
@@ -158,7 +160,7 @@ def ranking(record: TraceRecord, hop: int, t: float, style: Style) -> list[str]:
         fresh = node.hop == hop
         value = node.energy * ease(t) if fresh else node.energy
         weak = node.energy < record.threshold
-        label = _label(node.id, cfg.label_chars).ljust(cfg.label_chars)
+        label = _label(node.id, cfg.label_chars, g).ljust(cfg.label_chars)
         if weak:
             meter = style.paint(
                 bar(value, strongest, cfg.bar_width, style.faint_blocks).ljust(
@@ -193,8 +195,8 @@ def ranking(record: TraceRecord, hop: int, t: float, style: Style) -> list[str]:
     if len(shown) > cfg.max_rows:
         rows.append(style.paint(f"  +{len(shown) - cfg.max_rows} more", "muted"))
     for ghost in ghosts(record, hop)[:3]:
-        label = _label(ghost.id, cfg.label_chars).ljust(cfg.label_chars)
-        survivor = _label(ghost.suppressed_by, cfg.label_chars)
+        label = _label(ghost.id, cfg.label_chars, g).ljust(cfg.label_chars)
+        survivor = _label(ghost.suppressed_by, cfg.label_chars, g)
         rows.append(
             f"  {style.paint(g.dup, 'muted')} {style.paint(label, 'muted')} "
             + " " * cfg.bar_width
@@ -247,7 +249,7 @@ def ring_map(
             )
             put(row, col, g.ring, "dim")
     present = {n.id for n in visible(record, hop)}
-    labels: list[tuple[int, int, str, str]] = []
+    labels: list[tuple[float, int, int, str, str]] = []
     for node in nodes:
         if node.id not in present:
             if not (node.suppressed_by and node.suppressed_by in present):
@@ -262,18 +264,27 @@ def ring_map(
         row, col = cell(*layout[node.id])
         painted = style.hop(glyph, node.hop) if not sty else style.paint(glyph, sty)
         put(row, col, painted, "raw")
-        labels.append((row, col, _label(node.id, style.config.label_chars), sty))
+        labels.append(
+            (node.energy, row, col, _label(node.id, style.config.label_chars, g), sty)
+        )
     centre = cell(0.5, 0.5)
     if grid[centre[0]][centre[1]] in (" ", g.ring):
         put(centre[0], centre[1], style.paint(g.seed, "accent", "bold"), "raw")
-    for row, col, text, sty in labels:
-        right = col >= cx
-        text = " " + text if right else text + " "
-        start = col + 1 if right else col - len(text)
-        for i, ch in enumerate(text):
-            c = start + i
-            if 0 <= c < cols and grid[row][c] in (" ", g.ring):
-                grid[row][c], color[row][c] = ch, sty or "hop"
+    # Strongest first, and a label is drawn whole or not at all: on a crowded
+    # map the atoms that matter keep their names, and no two names are ever
+    # woven into one unreadable run of characters.
+    for _energy, row, col, name, sty in sorted(labels, key=lambda item: -item[0]):
+        outward = col >= cx
+        # Outward first, where the rings leave room; the inner side when an
+        # atom already sits there.
+        for right in (outward, not outward):
+            text = " " + name if right else name + " "
+            start = col + 1 if right else col - len(text)
+            span = range(start, start + len(text))
+            if all(0 <= c < cols and grid[row][c] in (" ", g.ring) for c in span):
+                for c, ch in zip(span, text, strict=True):
+                    grid[row][c], color[row][c] = ch, sty or "hop"
+                break
     lines: list[str] = []
     for r in range(rows):
         out = ""

@@ -134,3 +134,29 @@ def test_a_record_with_nothing_activated_says_so() -> None:
     rows = ranking(record, 0, 1.0, style())
     assert rows == ["  nothing activated"]
     assert ring_map(record, 0, 1.0, style(), cols=60, rows=13) == []
+
+
+def test_a_crowded_map_draws_each_label_whole_or_not_at_all() -> None:
+    from spiyweb.commands import demo_records
+    from spiyweb.results import short_id
+    from spiyweb.trace import TraceNode
+
+    crowded = demo_records()[0]
+    s = style()
+    labels = {
+        short_id(n.id, 12, "…") for n in crowded.nodes if isinstance(n, TraceNode)
+    }
+    glyphs = "●○◉⊘·"
+    drawn = ring_map(crowded, crowded.hops_used, 1.0, s, cols=48, rows=15)
+    tokens = [
+        token.strip(glyphs)
+        for line in drawn
+        for token in line.split()
+        if token.strip(glyphs)
+    ]
+    assert tokens, "the map has labels at all"
+    broken = [token for token in tokens if token not in labels]
+    assert broken == [], f"labels drawn through each other: {broken}"
+    roomy = ring_map(canonical_record(), 2, 1.0, s, cols=60, rows=15)
+    named = {t.strip(glyphs) for line in roomy for t in line.split()}
+    assert {"A", "C", "D", "B", "F"} <= named, "with room, every atom keeps its name"

@@ -42,22 +42,41 @@ spiyweb
 ```
 
 `spiyweb` takes the window over: a welcome box with the spider, a
-transcript, a `/` prompt, a status bar. Start your project in a second
-terminal - or from the prompt with `! python app.py` - and every query it
-makes through `spiyweb.open_index(...)` plays on screen as it happens.
-`/help` lists the commands, `?` the shortcuts, `/config` the knobs (profile,
-ring map, spider, speed, glyphs, colour, mouse). Only closing the terminal
-ends it.
+transcript, a prompt, a status bar. Everything happens from there - type a
+question as a plain sentence, or a `/` command. The input box says what to
+type first until you have typed anything. Only closing the terminal ends it.
 
-Building an index needs the index-time extras once:
+A first session, without leaving the screen:
 
-```bash
-pip install "spiyweb[index]"
-python -m spacy download xx_ent_wiki_sm
+```text
+/demo                    three recorded questions spread on a sample corpus
+/doctor                  what is installed, what is missing, and the fix
+/install index           the index-time extras and the spaCy model, in the background
+/index                   pick a folder of .txt/.md, pick the options, build
+who built the tower?     a plain sentence is a question for the active index
+/show 2                  the second passage in full: text, source, how the energy got there
+/compare who built it?   the same question as plain top-k, and what only the web found
 ```
 
-or, inside the monitor, `/install index`. `pip install spiyweb` on its own
-pulls in **nothing** - the core is pure Python.
+`/index` runs in the background with its stage and elapsed time in the
+status line (and the terminal bell when a long build ends), so the screen
+never freezes; `/kill` stops it. The index it builds becomes the active one
+- the status bar names it, `/indexes` switches between the ones nearby, and
+it is remembered next time. `/tune damping 0.8 seed 6` changes the spread
+for the session and asks the last question again; `/config` holds the
+lasting knobs (profile, warm follow-ups, ring map, speed, glyphs, colour,
+mouse). `/save` writes the query on screen to a Markdown file. `/help` lists
+every command, `?` the shortcuts, tab completes commands and folders, and
+up/down remembers earlier sessions.
+
+Your own application can be watched too: start it in a second terminal -
+or from the prompt with `! python app.py` - and every query it makes
+through `spiyweb.open_index(...)` plays on screen as it happens.
+
+`pip install spiyweb` on its own pulls in **nothing** - the core is pure
+Python. Building an index needs the index-time extras once (`/install index`
+in the monitor, or `pip install "spiyweb[index]"` plus
+`python -m spacy download xx_ent_wiki_sm`).
 
 If the console cannot draw braille or box lines (an old `conhost`, a plain
 `TERM=dumb`), `SPIYWEB_ASCII=1 spiyweb` uses the plain glyph set; a pipe or
@@ -98,14 +117,15 @@ entire value proposition.
 ## Try it
 
 What the monitor shows: the ranking bars growing in hop by hop on the
-left, the ring map on the right, the ledger line under both, and the top
-passages under that. No socket, no server, no code in your application:
-the monitor leaves a marker in `.spiyweb/`, the library appends its
-records there while the marker is fresh, the monitor tails them. `/find`
-locates the file that imports spiyweb and the index it opens; `/query`,
-`/lint`, `/index` and `/install` are the old menu's questions as commands;
-`/replay` plays a recorded query again; `examples/hello_web.py` is a
-three-question app to watch first.
+left, the ring map on the right, the ledger line under both, the numbered
+top passages under that - and, only when the run found them, the things a
+ranking hides: contradictions kept on both sides, claims the corpus
+disputes, themes with no bridge between them. No socket, no server, no code
+in your application: the monitor leaves a marker in `.spiyweb/`, the
+library appends its records there while the marker is fresh, the monitor
+tails them. `/find` locates the file that imports spiyweb and the index it
+opens; `/lint` reads the corpus's shape; `/replay` plays a recorded query
+again; `examples/hello_web.py` is a three-question app to watch first.
 
 The same verbs work without the screen, for scripts and pipes:
 

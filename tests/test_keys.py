@@ -73,9 +73,10 @@ def test_windows_keys_are_named_and_letters_stay_letters(
     assert len(reads) == (1 if second is not None else 0)
 
 
-def test_ctrl_c_is_raised_not_returned() -> None:
-    with pytest.raises(KeyboardInterrupt):
-        name_windows_key("\x03", lambda: "")
+def test_ctrl_c_as_a_character_is_returned_for_the_monitor_to_decide() -> None:
+    from spiyweb.keys import CTRL_C
+
+    assert name_windows_key("\x03", lambda: "") == CTRL_C, "never raised here"
 
 
 def test_poll_returns_none_after_the_timeout_without_a_key(

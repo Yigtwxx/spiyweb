@@ -34,6 +34,17 @@ ruff check . && ruff format --check .
 pytest
 ```
 
+If the release changes what a query produces - the propagation, the
+profiles, dedup, the trace format - re-record the `/demo` queries so the
+monitor's first impression is the current pipeline's real output:
+
+```bash
+python examples/make_demo.py      # needs the index extras and the spaCy model
+```
+
+It rewrites `src/spiyweb/demo.jsonl`; commit that file with the change.
+The wheel smoke checks it shipped and plays with nothing installed.
+
 ## Build and verify the artifact
 
 Build **both** targets with a bare `uv build`, never `uv build --wheel`.

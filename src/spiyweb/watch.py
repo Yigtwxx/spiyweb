@@ -24,7 +24,6 @@ injectable, which is what makes the whole screen testable without a tty.
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import queue
@@ -43,6 +42,7 @@ from spiyweb.banner import wordmark_lines, wordmark_width
 from spiyweb.config import WatchConfig
 from spiyweb.keys import (
     BACKSPACE,
+    CTRL_C,
     DELETE,
     DISABLE_FOCUS,
     DISABLE_MOUSE,
@@ -66,7 +66,10 @@ from spiyweb.keys import (
     parse_mouse,
     poll_raw,
 )
+from spiyweb.nearby import complete_path, find_indexes, is_index, split_last_token
 from spiyweb.pet import FULL, pet_lines, pet_width
+from spiyweb.progress import JobProgress
+from spiyweb.results import honesty_lines, preview, ranked_passages
 from spiyweb.terminal import (
     CLEAR_SCREEN,
     ERASE_LINE,
@@ -91,12 +94,25 @@ from spiyweb.trace import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
+
+    from spiyweb.core.propagate import PropagationResult
+    from spiyweb.profiles import Profile
+    from spiyweb.session import SpiywebIndex
 
 __all__ = ["Job", "Marker", "Monitor", "TraceTail", "interactive", "run_monitor"]
 
 SETTINGS_FILENAME = "monitor.json"
 """Where `/config` choices persist, next to the marker."""
+
+HISTORY_FILENAME = "history"
+"""Typed lines, one per row, for up/down across sessions."""
+
+BORDER_TAIL = 2
+"""Border characters right of a box label, before the corner."""
+
+LABEL_MIN = 12
+"""A box label with fewer columns than this left to it says nothing."""
 
 STOP_HOLD_MS = 1200
 """How long the finished picture stays live before it joins the transcript."""
@@ -107,11 +123,15 @@ CAUGHT_MS = 500
 MAP_MIN_ROWS = 7
 """A map shorter than this is a smudge; below it the ranking stands alone."""
 
+BELL = "\a"
+"""The terminal bell: a long job finished while nobody was looking."""
+
 DOUBLE_INTERRUPT_S = 1.0
 """Two ctrl-c inside this window leave; one clears the prompt."""
 
 JOB_LINES_PER_TICK = 20
 """How much of a job's output one tick may log; the rest waits its turn."""
+
 
 MOUSE_SCROLL_ROWS = 3
 """Transcript rows one wheel notch moves."""
@@ -276,7 +296,8 @@ def same_python(command: str) -> str:
 
 @dataclass
 class Job:
-    """A shell command started with `!`, running beside the monitor.
+    """A child process running beside the monitor: a `!` shell command, or
+    a verb the monitor started itself (`/index`, `/lint`, `/install`).
 
     Its output arrives through a queue fed by a reader thread and is logged
     a few lines per tick, so a chatty server never stalls the screen. The
@@ -289,16 +310,62 @@ class Job:
     lines: queue.Queue[str | None] = field(default_factory=queue.Queue)
     done: bool = False
     exit_code: int | None = None
+    started: float = 0.0
+    progress: JobProgress | None = None
+    """Reads the job's lines into a status - and keeps bar lines out of the
+    transcript. `None` for a `!` command: its output is the point."""
+    on_done: Callable[[Job], None] | None = None
+    """Called once when the process has ended and its output is logged."""
+    stopped: bool = False
+    """Ended by `/kill` rather than by itself."""
+    eof: bool = False
+    """Its output has ended. `done` follows once the exit code is in - two
+    steps, so an interrupt between them is retried, never lost."""
 
     @classmethod
     def start(cls, number: int, command: str, cwd: Path) -> Job:
+        """`! <command>`: through the shell, exactly as typed."""
         command = same_python(command)
+        return cls._launch(number, command, command, cwd, shell=True)
+
+    @classmethod
+    def spawn(
+        cls,
+        number: int,
+        argv: Sequence[str],
+        cwd: Path,
+        *,
+        shown: str,
+        started: float = 0.0,
+        progress: JobProgress | None = None,
+        on_done: Callable[[Job], None] | None = None,
+    ) -> Job:
+        """An argv, no shell: paths with spaces stay one argument, nothing
+        typed is ever interpreted, and stopping it stops the real child."""
+        job = cls._launch(number, list(argv), shown, cwd, shell=False)
+        job.started, job.progress, job.on_done = started, progress, on_done
+        return job
+
+    @classmethod
+    def _launch(
+        cls,
+        number: int,
+        command: str | list[str],
+        shown: str,
+        cwd: Path,
+        *,
+        shell: bool,
+    ) -> Job:
         environment = dict(os.environ)
         here = str(Path(sys.executable).parent)
         environment["PATH"] = here + os.pathsep + environment.get("PATH", "")
+        # A piped Python child buffers its stdout in blocks: without this a
+        # job's progress would arrive all at once, when it ends.
+        environment["PYTHONUNBUFFERED"] = "1"
+        environment["PYTHONIOENCODING"] = "utf-8"
         process = subprocess.Popen(
             command,
-            shell=True,
+            shell=shell,
             cwd=str(cwd),
             env=environment,
             stdin=subprocess.DEVNULL,
@@ -308,8 +375,9 @@ class Job:
             encoding="utf-8",
             errors="replace",
             bufsize=1,
+            **own_process_group(),
         )
-        job = cls(number=number, command=command, process=process)
+        job = cls(number=number, command=shown, process=process)
 
         def pump() -> None:
             assert process.stdout is not None
@@ -329,19 +397,58 @@ class Job:
             except queue.Empty:
                 break
             if item is None:
-                self.done = True
-                self.exit_code = self.process.wait()
+                self.eof = True
                 break
             out.append(item)
+        if self.eof and not self.done:
+            self.exit_code = self.process.wait()
+            self.done = True
+            stream = getattr(self.process, "stdout", None)
+            if stream is not None:
+                stream.close()
         return out, self.done
 
     def stop(self) -> None:
+        """The whole group, not only its leader: a shell's child or a
+        server's workers would otherwise outlive the job - and, holding its
+        output open, keep it "running" after the leader is gone."""
+        if self.done:
+            return
+        self.stopped = True
+        stop_group(self.process)
         if self.process.poll() is None:
-            self.process.terminate()
             try:
                 self.process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 self.process.kill()
+
+
+def own_process_group() -> dict[str, object]:
+    """Popen options that give a job its own process group, so the ctrl-c
+    meant for the monitor never reaches it - the monitor decides whether a
+    ctrl-c leaves, and a job is stopped with `/kill`, not by accident."""
+    if sys.platform == "win32":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def stop_group(process: subprocess.Popen[str]) -> None:
+    if sys.platform == "win32":
+        # `terminate()` would stop only the shell; taskkill takes the tree.
+        done = subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(process.pid)],
+            capture_output=True,
+            check=False,
+        )
+        if done.returncode != 0:
+            process.terminate()
+        return
+    import signal  # pragma: no cover - exercised off Windows
+
+    try:  # pragma: no cover
+        os.killpg(process.pid, signal.SIGTERM)
+    except OSError:  # pragma: no cover
+        process.terminate()
 
 
 @dataclass
@@ -358,6 +465,11 @@ class Settings:
     mouse: bool = False
     """Off: the terminal keeps its own selection and copy. On: the wheel
     scrolls here and a click picks - and copying needs shift+drag."""
+    index: str = ""
+    """The index a typed question goes to; `""` while none is chosen."""
+    warm: bool = False
+    """A follow-up lands on the ground the last question warmed (D22). Off
+    by default: an unrelated question would inherit the last one's region."""
 
     @classmethod
     def load(cls, path: Path, *, base: Settings | None = None) -> Settings:
@@ -413,6 +525,8 @@ class Monitor:
             hop_delay_ms=self.config.hop_delay_ms,
         )
         self.settings = Settings.load(self.directory / SETTINGS_FILENAME, base=base)
+        if self.settings.index and not is_index(self.settings.index):
+            self.settings.index = ""  # moved or deleted since the last session
         if self.color is None:
             self.color = supports_color() and self.settings.color
         if self.unicode is None:
@@ -425,8 +539,10 @@ class Monitor:
         self.transcript: list[str] = []
         self._buffer = ""
         self.cursor = 0
-        self.history: list[str] = []
-        self.history_at = 0
+        self.history: list[str] = load_history(
+            self.directory / HISTORY_FILENAME, self.config.history_max
+        )
+        self.history_at = len(self.history)
         self.tab_seed: str | None = None
         self.queue: deque[tuple[TraceRecord, tuple[str, ...]]] = deque()
         self.played: list[TraceRecord] = []
@@ -435,8 +551,25 @@ class Monitor:
         self.prompt: Prompt | None = None
         self.last_record_at: float | None = None
         self.last_interrupt = -1e9
-        self.suggested_index: str | None = None
-        self.indexes: dict[str, object] = {}
+        self.find_hints: list[str] = []
+        self.last_question = ""
+        """Asked again by `/tune`, so a changed knob shows what it does."""
+        self.tuned: Profile | None = None
+        """`/tune`'s knobs - this session only, never saved: a saved knob
+        would quietly change every later answer."""
+        self.warm_from: PropagationResult | None = None
+        """The last answer's activations, while `/config` warm is on."""
+        """Index folders `/find` saw an application open - offered first."""
+        self.hint_dismissed = False
+        """The first message sent: the input box stops saying how to start."""
+        self.has_nearby = bool(self.active_index) or bool(find_indexes(self.cwd))
+        self.indexes: dict[str, tuple[int, SpiywebIndex]] = {}
+        """Opened indexes by resolved path, with the `meta.json` stamp they
+        were opened at: a rebuild changes the stamp and the next query
+        reopens instead of answering from the old graph."""
+        self.embedder: object | None = None
+        """One embedding model for every index that names the default one -
+        each `SpiywebIndex` would otherwise load its own copy."""
         self.jobs: list[Job] = []
         self.running = True
         self.dirty = True
@@ -475,6 +608,33 @@ class Monitor:
 
     def move(self, step: int) -> None:
         self.cursor = max(0, min(len(self._buffer), self.cursor + step))
+
+    # --- the active index --------------------------------------------------
+
+    @property
+    def active_index(self) -> str | None:
+        """Where a typed question goes; remembered across sessions."""
+        return self.settings.index or None
+
+    def set_active(self, path: str | Path | None) -> None:
+        if str(path or "") != self.settings.index:
+            self.warm_from = None  # another corpus: nothing of it is warm
+        self.settings.index = str(path) if path else ""
+        self.settings.save(self.directory / SETTINGS_FILENAME)
+        if path:
+            self.has_nearby = True
+        self.dirty = True
+
+    def asking_as(self) -> str:
+        """How a question is asked right now, for the status bar."""
+        how = "tuned" if self.tuned is not None else self.settings.profile
+        if self.settings.warm and self.warm_from is not None:
+            how += f" {self.glyphs.dot} warm"
+        return how
+
+    def refresh_nearby(self) -> None:
+        """After an index was built or chosen: does the start hint still apply."""
+        self.has_nearby = bool(self.active_index) or bool(find_indexes(self.cwd))
 
     # --- settings ----------------------------------------------------------
 
@@ -532,11 +692,25 @@ class Monitor:
 
     # --- screen ------------------------------------------------------------
 
-    def boxed(self, rows: list[str], width: int) -> list[str]:
+    def boxed(self, rows: list[str], width: int, *, label: str = "") -> list[str]:
+        """A rounded box `width` wide; `label` sits in the top border at the
+        right, the way a hint does - clipped, or dropped when there is no
+        room for it to say anything."""
         g = self.glyphs
         inner = width - 4
         edge = self.paint(g.v, "dim")
-        top = self.paint(g.tl + g.h * (width - 2) + g.tr, "dim")
+        room = width - 8 - BORDER_TAIL  # corners, spaces, a few h on the left
+        if label and room >= LABEL_MIN:
+            if len(label) > room:
+                label = label[: room - len(g.ellipsis)] + g.ellipsis
+            run = width - 2 - BORDER_TAIL - len(label) - 2
+            top = (
+                self.paint(g.tl + g.h * run + " ", "dim")
+                + self.paint(label, "muted")
+                + self.paint(" " + g.h * BORDER_TAIL + g.tr, "dim")
+            )
+        else:
+            top = self.paint(g.tl + g.h * (width - 2) + g.tr, "dim")
         bottom = self.paint(g.bl + g.h * (width - 2) + g.br, "dim")
         return [top, *[edge + " " + pad(r, inner) + " " + edge for r in rows], bottom]
 
@@ -650,6 +824,19 @@ class Monitor:
                 + " "
                 + hint
             )
+        job = self.busy()
+        if job is not None and job.progress is not None:
+            glyph = g.spin[self.tick_count % len(g.spin)]
+            parts = job.progress.parts(now)
+            return (
+                " "
+                + self.paint(glyph, "accent")
+                + " "
+                + self.paint(parts[0], "accent")
+                + self.paint(f" {g.dot} ", "dim")
+                + self.paint(f" {g.dot} ".join(parts[1:]), "muted")
+                + self.paint(f"   /kill {job.number} stops it", "dim")
+            )
         if self.last_record_at is None:
             return (
                 " "
@@ -697,39 +884,56 @@ class Monitor:
                 body = before + under + after
         else:
             body = caret + self.paint(
-                "type a command - / lists them, ! runs a shell command", "dim"
+                "ask a question - / lists the commands, ! runs a shell command", "dim"
             )
-        return self.boxed([self.paint(g.prompt, "accent", "bold") + " " + body], width)
+        hint = input_hint(
+            dismissed=self.hint_dismissed,
+            modal=self.prompt is not None or self.picker is not None,
+            busy=self.busy() is not None,
+            has_index=self.has_nearby,
+        )
+        return self.boxed(
+            [self.paint(g.prompt, "accent", "bold") + " " + body], width, label=hint
+        )
 
     def status_bar(self, width: int) -> str:
+        """Left: how to get help. Right: which index a question goes to and
+        how, then the attach state - least useful dropped first when the
+        terminal is narrow."""
         g = self.glyphs
         left = self.paint("  ? for shortcuts", "dim") + self.paint(
             f"  {g.dot}  /help", "dim"
         )
         live = self.last_record_at is not None
         dot = self.paint(g.live, "good") if live else self.paint(g.off, "muted")
-        right = (
-            dot
-            + " "
-            + self.paint("attached" if live else "listening", "muted")
-            + " "
-            + self.paint(g.dot, "dim")
-            + " "
-            + self.paint(self._shown_dir(), "muted")
-            + " "
-            + self.paint(g.dot, "dim")
-            + " "
-            + self.paint(f"{len(self.played)} played", "muted")
-            + (
-                " "
-                + self.paint(g.dot, "dim")
-                + " "
-                + self.paint(f"{self.tail.skipped} unreadable", "warn")
-                if self.tail.skipped
-                else ""
-            )
-            + "  "
-        )
+        index = self.active_index
+        segments: list[tuple[int, str]] = [
+            (
+                0,
+                self.paint(Path(index).name, "accent")
+                if index
+                else self.paint("no index", "muted"),
+            ),
+            (1, self.paint(self.asking_as(), "muted")),
+            (0, dot + " " + self.paint("attached" if live else "listening", "muted")),
+            (3, self.paint(self._shown_dir(), "muted")),
+            (4, self.paint(f"{len(self.played)} played", "muted")),
+        ]
+        if self.tail.skipped:
+            segments.append((2, self.paint(f"{self.tail.skipped} unreadable", "warn")))
+        separator = " " + self.paint(g.dot, "dim") + " "
+
+        def joined(kept: list[tuple[int, str]]) -> str:
+            return separator.join(text for _, text in kept) + "  "
+
+        kept = list(segments)
+        while (
+            printed_width(left) + 1 + printed_width(joined(kept)) > width
+            and max(rank for rank, _ in kept) > 0
+        ):
+            worst = max(rank for rank, _ in kept)
+            kept = [segment for segment in kept if segment[0] != worst]
+        right = joined(kept)
         gap = width - printed_width(left) - printed_width(right)
         return left + " " * max(1, gap) + right
 
@@ -889,6 +1093,10 @@ class Monitor:
         self.dirty = True
 
     def _commit(self, play: Play) -> None:
+        # Marked done first: an interrupt half-way through the writing below
+        # must not leave the record playing, to be committed a second time.
+        self.playing = None
+        self.played.append(play.record)
         width, rows = self.size()
         map_rows = self.map_rows_for(play.record, width, rows - 12)
         self.log(
@@ -906,8 +1114,41 @@ class Monitor:
         )
         if play.after:
             self.reply(*play.after)
-        self.played.append(play.record)
-        self.playing = None
+        for tone, text in honesty_lines(play.record):
+            self.reply(self.paint(text, tone), tone=tone)
+
+    def passage_lines(
+        self, record: TraceRecord, texts: Mapping[str, str] | None = None
+    ) -> list[str]:
+        """The strongest passages under a played query, numbered for `/show`.
+
+        Text comes from the record; `texts` fills in for a record traced
+        without it (`TraceConfig.text_chars` can drop it)."""
+        cfg = self.config
+        texts = texts or {}
+        ranked = ranked_passages(record)[: cfg.after_passages]
+        if not ranked:
+            return []
+        rows = [
+            self.paint("top passages", "bold")
+            + self.paint("   /show <n> opens one", "dim")
+        ]
+        for number, node in enumerate(ranked, 1):
+            text = node.text or texts.get(node.id, "")
+            rows.append(
+                self.paint(f"{number:>2} ", "muted")
+                + self.paint(f"{node.energy:5.2f} ", "accent")
+                + self.paint(node.id, "muted")
+                + "  "
+                + preview(text, cfg.preview_chars, self.glyphs.ellipsis)
+            )
+        return rows
+
+    def current_record(self) -> TraceRecord | None:
+        """The query on screen: the one playing, else the last one played."""
+        if self.playing is not None:
+            return self.playing.record
+        return self.played[-1] if self.played else None
 
     # --- input -------------------------------------------------------------
 
@@ -948,7 +1189,7 @@ class Monitor:
             return
         if key != TAB:
             self.tab_seed = None
-        if key == "\x03":
+        if key == CTRL_C:
             if now - self.last_interrupt < DOUBLE_INTERRUPT_S:
                 self.running = False
                 return
@@ -1015,6 +1256,34 @@ class Monitor:
         elif key and key not in NAMED and key.isprintable():
             self.insert(key)
 
+    def handle(self, key: str, now: float) -> None:
+        """`handle_key`, but a failing command never takes the screen down:
+        every command, picker and prompt callback runs under it, so one
+        guard here covers them all. Drawing and ticking stay unguarded -
+        an error there is a bug in the monitor, not in what was asked."""
+        try:
+            self.handle_key(key, now)
+        except KeyboardInterrupt:
+            raise
+        except (Exception, SystemExit) as failure:
+            self.failed(failure)
+
+    def failed(self, failure: BaseException) -> None:
+        """Say what went wrong under the prompt; the traceback goes to the
+        debug log, never over the screen."""
+        if self.debug:
+            import traceback
+
+            self.debug(
+                "command failed\n"
+                + "".join(traceback.format_exception(failure)).rstrip()
+            )
+        self.prompt, self.picker = None, None
+        message = str(failure) or type(failure).__name__
+        self.reply(
+            self.paint(f"{type(failure).__name__}: {message}", "warn"), tone="warn"
+        )
+
     def _mouse(self, key: str) -> None:
         """Wheel scrolls the transcript; a left click picks what it lands on."""
         button, _column, row, pressed = parse_mouse(key)
@@ -1076,8 +1345,13 @@ class Monitor:
 
     def _complete(self) -> None:
         """Tab: the one match is typed out; several, the next one in turn.
-        The prefix typed before the first tab is what keeps cycling."""
+        The prefix typed before the first tab is what keeps cycling. After a
+        command and a space, what is completed is a path."""
         from spiyweb.commands import COMMANDS
+
+        if self.buffer.startswith("/") and " " in self.buffer:
+            self._complete_path()
+            return
 
         def matching(seed: str) -> list[str]:
             if not seed.startswith("/") or " " in seed:
@@ -1103,11 +1377,28 @@ class Monitor:
         self.tab_seed = seed
         self.buffer = nxt + (" " if len(matches) == 1 else "")
 
+    def _complete_path(self) -> None:
+        head, token = split_last_token(self.buffer)
+        seed = self.tab_seed if self.tab_seed is not None else token
+        matches = complete_path(seed, self.cwd)
+        if token not in matches:  # the line was edited since the last tab
+            seed, matches = token, complete_path(token, self.cwd)
+        if not matches:
+            return
+        if token in matches and len(matches) > 1:
+            nxt = matches[(matches.index(token) + 1) % len(matches)]
+        else:
+            nxt = matches[0]
+        # One match is a step taken: the next tab goes on from it, into the
+        # folder. Several are a choice: the next tab offers the next one.
+        self.tab_seed = seed if len(matches) > 1 else None
+        self.buffer = head + nxt
+
     def shortcuts(self) -> list[str]:
         rows = [
             ("/", "commands - keep typing to narrow, tab completes"),
-            ("tab", "complete the command (again: the next match)"),
-            ("up / down", "earlier commands"),
+            ("tab", "complete the command or a folder (again: the next match)"),
+            ("up / down", "earlier commands, remembered across sessions"),
             ("left / right", "move inside the line; home / end, ctrl-a / ctrl-e"),
             ("esc", "clear the line, or close a list"),
             ("ctrl-u", "clear the line"),
@@ -1140,13 +1431,19 @@ class Monitor:
         self.scroll = 0
         line, self.buffer = self.buffer.strip(), ""
         if self.prompt is not None:
+            self.hint_dismissed = True
             prompt, self.prompt = self.prompt, None
             prompt.on_answer(line or prompt.default)
             return
         if not line:
             return
+        self.hint_dismissed = True
         self.history.append(line)
         self.history_at = len(self.history)
+        if not line.startswith("!"):
+            # `!` lines are never written down: `! KEY=... python app.py`
+            # would leave a credential in a file.
+            append_history(self.directory / HISTORY_FILENAME, line, self.config)
         if line.startswith("!"):
             self.start_job(line[1:].strip())
             return
@@ -1172,30 +1469,108 @@ class Monitor:
             self.paint(same_python(command), "dim"),
         )
 
-    def pump_jobs(self) -> None:
-        for job in self.jobs:
+    def pump_jobs(self, now: float = 0.0) -> None:
+        from spiyweb.commands import problem_hint
+
+        for job in list(self.jobs):
             if job.done:
                 continue
             lines, ended = job.drain(JOB_LINES_PER_TICK)
             for line in lines:
+                if job.progress is not None and job.progress.feed(line):
+                    continue  # a progress bar: it lives in the status line
+                if job.progress is not None:
+                    if not line.strip():
+                        continue
+                    line = problem_hint(line)
                 self.log(
                     self.paint(f"  {self.glyphs.v} ", "dim")
                     + self.paint(f"{job.number} ", "muted")
                     + line
                 )
             if ended:
-                tone = "good" if job.exit_code == 0 else "warn"
-                self.reply(
-                    self.paint(f"job {job.number} ended", tone)
-                    + self.paint(f"  exit {job.exit_code}", "dim"),
-                    tone=tone,
-                )
+                self._ended(job, now)
             if lines or ended:
                 self.dirty = True
+
+    def _ended(self, job: Job, now: float) -> None:
+        tone = "good" if job.exit_code == 0 else "warn"
+        self.reply(
+            self.paint(f"job {job.number} ended", tone)
+            + self.paint(f"  exit {job.exit_code}", "dim"),
+            tone=tone,
+        )
+        bell = self.config.bell_after_s
+        if job.progress is not None and bell and now - job.started >= bell:
+            # Long enough that the person has looked away: the terminal's
+            # bell (a sound, or a flashing tab) says it is done.
+            assert self.write is not None
+            self.write(BELL)
+        if job.on_done is not None:
+            try:
+                job.on_done(job)
+            except (Exception, SystemExit) as failure:
+                self.failed(failure)
 
     def stop_jobs(self) -> None:
         for job in self.jobs:
             job.stop()
+
+    def spawn(
+        self,
+        argv: Sequence[str],
+        *,
+        shown: str,
+        progress: JobProgress | None = None,
+        on_done: Callable[[Job], None] | None = None,
+    ) -> Job | None:
+        """Start a child the monitor needs (a verb, pip) as a background job;
+        `None`, with the reason said, when it cannot start at all."""
+        try:
+            job = Job.spawn(
+                len(self.jobs) + 1,
+                argv,
+                self.cwd,
+                shown=shown,
+                started=self.clock(),
+                progress=progress,
+                on_done=on_done,
+            )
+        except OSError as failure:
+            self.reply(self.paint(str(failure), "warn"), tone="warn")
+            return None
+        if progress is not None:
+            progress.started = job.started
+        self.jobs.append(job)
+        self.reply(
+            self.paint(f"job {job.number}: {shown}", "muted")
+            + self.paint(f"  - in the background, /kill {job.number} stops it", "dim")
+        )
+        return job
+
+    def spawn_spiyweb(
+        self,
+        args: Sequence[str],
+        *,
+        progress: JobProgress | None = None,
+        on_done: Callable[[Job], None] | None = None,
+    ) -> Job | None:
+        """`spiyweb <args>` in a child, with THIS interpreter - never whichever
+        `spiyweb` the PATH finds first. The child crashing cannot take the
+        screen with it, and `/kill` can stop it."""
+        return self.spawn(
+            [sys.executable, "-m", "spiyweb", *args],
+            shown="spiyweb " + " ".join(_quoted(arg) for arg in args),
+            progress=progress or JobProgress(label=f"spiyweb {args[0]}", started=0),
+            on_done=on_done,
+        )
+
+    def busy(self) -> Job | None:
+        """The running job with a progress status, newest first."""
+        for job in reversed(self.jobs):
+            if not job.done and not job.stopped and job.progress is not None:
+                return job
+        return None
 
     # --- the loop ----------------------------------------------------------
 
@@ -1205,10 +1580,10 @@ class Monitor:
             pass
         for record in self.tail.poll():
             self.last_record_at = now
-            self.play(record)
-        self.pump_jobs()
+            self.play(record, after=self.passage_lines(record))
+        self.pump_jobs(now)
         self._advance(now)
-        if self.playing is not None or self.tick_count % 12 == 0:
+        if self.playing is not None or self.busy() or self.tick_count % 12 == 0:
             self.dirty = True
 
     def run(self) -> int:
@@ -1238,17 +1613,22 @@ class Monitor:
         )
         try:
             while self.running:
-                now = self.clock()
-                self.tick(now)
-                if self.dirty:
-                    self.draw(now)
-                key = self.poll(self.config.poll_ms / 1000)
-                if key is not None:
-                    self.handle_key(key, self.clock())
+                try:
+                    now = self.clock()
+                    self.tick(now)
                     if self.dirty:
-                        self.draw(self.clock())
-        except KeyboardInterrupt:
-            pass
+                        self.draw(now)
+                    key = self.poll(self.config.poll_ms / 1000)
+                    if key is not None:
+                        self.handle(key, self.clock())
+                        if self.dirty:
+                            self.draw(self.clock())
+                except KeyboardInterrupt:
+                    # A console turns ctrl-c into a signal, raised wherever
+                    # the loop happened to be - a draw may be half written.
+                    # It means what the key means: once clears, twice leaves.
+                    self.drawn = []
+                    self.handle_key(CTRL_C, self.clock())
         except Exception as failure:
             if self.debug:
                 import traceback
@@ -1257,53 +1637,65 @@ class Monitor:
             out(DISABLE_MOUSE + DISABLE_FOCUS + SHOW_CURSOR + "\n")
             raise failure
         finally:
-            self.stop_jobs()
-            self.marker.stop()
-            restore_windows_input(previous_input)
+            # The terminal first: stopping jobs can take seconds, and another
+            # ctrl-c in them must not leave a hidden cursor and mouse capture.
             out(DISABLE_MOUSE + DISABLE_FOCUS + SHOW_CURSOR + "\n")
             self.flush()
+            restore_windows_input(previous_input)
+            self.marker.stop()
+            try:
+                self.stop_jobs()
+            except KeyboardInterrupt:
+                pass
         return 0
 
-    # --- for commands ------------------------------------------------------
 
-    def run_captured(self, argv: list[str]) -> int:
-        """Run a CLI verb in-process, its output landing in the transcript."""
-        from contextlib import redirect_stderr, redirect_stdout
+def input_hint(*, dismissed: bool, modal: bool, busy: bool, has_index: bool) -> str:
+    """The one line on the input box's top border, until the first message.
 
-        from spiyweb.cli import Problem, main
+    Someone who has never used the monitor sees what to type first; once
+    they have typed anything it is gone for the session. Silent while a
+    list or a question is open (that has its own words) or a job runs.
+    """
+    if dismissed or modal or busy:
+        return ""
+    if has_index:
+        return "type a question, Enter"
+    return "start: /demo or /index <folder>"
 
-        self.echo("spiyweb " + " ".join(argv))
-        buffer = io.StringIO()
-        code = 0
-        try:
-            with redirect_stdout(buffer), redirect_stderr(buffer):
-                code = main(argv)
-        except Problem as problem:
-            from spiyweb.commands import problem_hint
 
-            self.reply(self.paint(problem_hint(str(problem)), "warn"), tone="warn")
-            return 1
-        except KeyboardInterrupt:
-            self.reply(self.paint("interrupted", "warn"), tone="warn")
-            return 130
-        lines = [line.rstrip() for line in buffer.getvalue().splitlines()]
-        while lines and not lines[-1]:
-            lines.pop()
-        if lines:
-            self.reply(*lines)
-        return int(code)
+def load_history(path: Path, limit: int) -> list[str]:
+    """The last `limit` lines typed in earlier sessions here."""
+    if limit <= 0:
+        return []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    return [line for line in lines if line.strip()][-limit:]
 
-    def suspended(self, action: Callable[[], int]) -> int:
-        """Give the real terminal to `action` (the old wizard), then take it back."""
-        out = self.write
-        assert out is not None
-        out(SHOW_CURSOR + CLEAR_SCREEN)
-        try:
-            return action()
-        finally:
-            out(HIDE_CURSOR + CLEAR_SCREEN)
-            self.drawn = []
-            self.dirty = True
+
+def append_history(path: Path, line: str, config: WatchConfig) -> None:
+    """One more line; the file is cut back to `history_max` once it is twice
+    that long, so it never grows without bound."""
+    if config.history_max <= 0:
+        return
+    try:
+        ensure_private_dir(path.parent)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(line.replace("\n", " ") + "\n")
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if len(lines) > 2 * config.history_max:
+            path.write_text(
+                "\n".join(lines[-config.history_max :]) + "\n", encoding="utf-8"
+            )
+    except OSError:
+        pass
+
+
+def _quoted(arg: str) -> str:
+    """An argument as it would have to be typed: quoted when it has a space."""
+    return f'"{arg}"' if " " in arg else arg
 
 
 def _debug_log(directory: Path) -> Callable[[str], None] | None:

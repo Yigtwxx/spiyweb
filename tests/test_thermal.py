@@ -158,3 +158,16 @@ def test_a_session_profile_overlays_the_given_config() -> None:
 def test_a_session_refuses_an_unknown_profile() -> None:
     with pytest.raises(ValueError, match="compare"):
         ThermalSession(FakeIndex(), CHAIN, profile="fast")
+
+
+def test_residue_of_is_the_rule_the_session_injects() -> None:
+    from spiyweb.thermal import residue_of
+
+    session = ThermalSession(FakeIndex(), CHAIN, RetrievalConfig())
+    first = session.retrieve(QUERY_AB)
+    assert residue_of(first.propagation, ThermalConfig()) == session.residue()
+    assert residue_of(first.propagation, ThermalConfig()) == pytest.approx(
+        {"A": 2.5, "B": 1.5}
+    )
+    assert residue_of(None, ThermalConfig()) == {}
+    assert residue_of(first.propagation, ThermalConfig(enabled=False)) == {}

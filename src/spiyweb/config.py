@@ -1085,6 +1085,18 @@ class WatchConfig:
         find_max_depth: How deep `/find` walks below the working directory.
         find_max_files: How many files `/find` reads before it stops.
         find_max_file_bytes: Files larger than this are skipped by `/find`.
+        bell_after_s: A background verb (`/index`, `/lint`, `/install`) that
+            ran at least this long rings the terminal bell when it ends.
+            `0` never rings.
+        doctor_timeout_s: How long `/doctor` waits for the LLM server to
+            answer before calling it unreachable.
+        history_max: Typed lines kept for up/down across sessions, in
+            `<attach_dir>/history`. `0` keeps them in memory only. Lines
+            starting with `!` are never written: they can carry secrets.
+        after_passages: Passages listed, numbered, under a played query -
+            `/show n` opens one. A screen, not a `top-k`: the web already
+            stopped itself.
+        preview_chars: Each listed passage is cut to one line this long.
     """
 
     attach_dir: str | Path = ATTACH_DIR
@@ -1106,8 +1118,21 @@ class WatchConfig:
     find_max_depth: int = 6
     find_max_files: int = 5000
     find_max_file_bytes: int = 1_000_000
+    bell_after_s: float = 10.0
+    doctor_timeout_s: float = 1.0
+    history_max: int = 500
+    after_passages: int = 3
+    preview_chars: int = 160
 
     def __post_init__(self) -> None:
+        if self.after_passages < 0 or self.preview_chars < 8:
+            raise ValueError("after_passages >= 0 and preview_chars >= 8")
+        if self.history_max < 0:
+            raise ValueError("history_max must not be negative")
+        if self.bell_after_s < 0 or self.doctor_timeout_s <= 0:
+            raise ValueError(
+                "bell_after_s must not be negative and doctor_timeout_s positive"
+            )
         if self.stale_s <= 0 or self.heartbeat_s <= 0:
             raise ValueError("stale_s and heartbeat_s must be positive")
         if self.heartbeat_s * 2 > self.stale_s:

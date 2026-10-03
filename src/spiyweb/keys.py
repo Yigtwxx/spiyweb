@@ -15,7 +15,11 @@ Platform notes, both stdlib:
 - POSIX: `select()` on a cooked tty only wakes on a full LINE, so the
   terminal is put in cbreak mode around the `select` + `read` pair - at most
   one poll slice, nothing printed inside - and restored in a `finally`.
-  Ctrl-C still arrives as a character here (`\\x03`) and is raised.
+
+Ctrl-C is a key like any other when it arrives as a character (`CTRL_C`):
+the monitor decides what it means (once clears the line, twice leaves). A
+console that turns it into a signal raises `KeyboardInterrupt` wherever the
+loop happens to be instead, and the monitor maps that onto the same key.
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "BACKSPACE",
+    "CTRL_C",
     "DELETE",
     "DISABLE_FOCUS",
     "DISABLE_MOUSE",
@@ -60,6 +65,7 @@ ENTER, BACKSPACE, ESCAPE, TAB = "enter", "backspace", "escape", "tab"
 FOCUS_IN, FOCUS_OUT = "focus_in", "focus_out"
 HOME_KEY, END_KEY, DELETE = "home", "end", "delete"
 PAGE_UP, PAGE_DOWN = "page_up", "page_down"
+CTRL_C = "\x03"
 MOUSE = "mouse"
 """Prefix of a mouse report: `mouse:<button>:<column>:<row>:<press|release>`."""
 ENABLE_MOUSE, DISABLE_MOUSE = "\x1b[?1000h\x1b[?1006h", "\x1b[?1006l\x1b[?1000l"
@@ -234,6 +240,4 @@ def _name_char(char: str) -> str:
         return ESCAPE
     if char == "\t":
         return TAB
-    if char == "\x03":
-        raise KeyboardInterrupt
     return char
