@@ -12,10 +12,7 @@
             "page_url": "https://commons.wikimedia.org/wiki/File:PSM_V50_D391_Epeira_diadema_suspended_by_its_thread.jpg",
             "source_url": "https://upload.wikimedia.org/wikipedia/commons/7/7c/PSM_V50_D391_Epeira_diadema_suspended_by_its_thread.jpg",
             "contrast": 1.5,
-            "tones": [
-                "paper",
-                "azure"
-            ]
+            "tones": ["paper", "azure"]
         },
         {
             "id": "dew",
@@ -33,9 +30,7 @@
                 "w": 1.0,
                 "h": 1.0
             },
-            "tones": [
-                "navy"
-            ]
+            "tones": ["navy"]
         },
         {
             "id": "argiope",
@@ -54,9 +49,7 @@
                 "w": 0.66,
                 "h": 0.78
             },
-            "tones": [
-                "paper"
-            ]
+            "tones": ["paper"]
         },
         {
             "id": "hokusai",
@@ -75,10 +68,7 @@
                 "h": 0.89
             },
             "contrast": 1.5,
-            "tones": [
-                "paper",
-                "azure"
-            ]
+            "tones": ["paper", "azure"]
         },
         {
             "id": "geometric",
@@ -96,10 +86,7 @@
                 "w": 0.94,
                 "h": 0.94
             },
-            "tones": [
-                "paper",
-                "azure"
-            ],
+            "tones": ["paper", "azure"],
             "contrast": 1.7
         },
         {
@@ -112,9 +99,7 @@
             "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
             "page_url": "https://commons.wikimedia.org/wiki/File:PSM_V33_D817_Web_of_the_garden_spider.jpg",
             "source_url": "https://upload.wikimedia.org/wikipedia/commons/2/23/PSM_V33_D817_Web_of_the_garden_spider.jpg",
-            "tones": [
-                "paper"
-            ]
+            "tones": ["paper"]
         },
         {
             "id": "snare",
@@ -126,9 +111,7 @@
             "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
             "page_url": "https://commons.wikimedia.org/wiki/File:PSM_V50_D392_Snare_of_long_bodied_garden_spider_tretnagnatha_extensa.jpg",
             "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/5f/PSM_V50_D392_Snare_of_long_bodied_garden_spider_tretnagnatha_extensa.jpg",
-            "tones": [
-                "paper"
-            ]
+            "tones": ["paper"]
         },
         {
             "id": "foxglove",
@@ -140,10 +123,7 @@
             "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
             "page_url": "https://commons.wikimedia.org/wiki/File:Pine,_Foxglove,_Spiderweb,_Wind.jpg",
             "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/fb/Pine%2C_Foxglove%2C_Spiderweb%2C_Wind.jpg",
-            "tones": [
-                "paper",
-                "azure"
-            ]
+            "tones": ["paper", "azure"]
         },
         {
             "id": "mankes",
@@ -163,9 +143,7 @@
                 "h": 0.405
             },
             "gamma": 1.0,
-            "tones": [
-                "navy"
-            ],
+            "tones": ["navy"],
             "contrast": 1.7
         },
         {
@@ -185,10 +163,7 @@
                 "w": 0.555,
                 "h": 0.6
             },
-            "tones": [
-                "paper",
-                "azure"
-            ]
+            "tones": ["paper", "azure"]
         },
         {
             "id": "tempesta",
@@ -207,10 +182,7 @@
                 "w": 0.96,
                 "h": 0.83
             },
-            "tones": [
-                "paper",
-                "azure"
-            ]
+            "tones": ["paper", "azure"]
         },
         {
             "id": "luyken",
@@ -229,10 +201,7 @@
                 "w": 0.96,
                 "h": 0.96
             },
-            "tones": [
-                "paper",
-                "azure"
-            ]
+            "tones": ["paper", "azure"]
         },
         {
             "id": "weiditz",
@@ -251,10 +220,7 @@
                 "w": 1.0,
                 "h": 1.0
             },
-            "tones": [
-                "paper",
-                "azure"
-            ]
+            "tones": ["paper", "azure"]
         },
         {
             "id": "vault",
@@ -273,10 +239,7 @@
                 "w": 1.0,
                 "h": 0.85
             },
-            "tones": [
-                "paper",
-                "azure"
-            ]
+            "tones": ["paper", "azure"]
         },
         {
             "id": "dijsselhof",
@@ -289,10 +252,7 @@
             "page_url": "https://commons.wikimedia.org/wiki/File:Titelhoofd_met_kruisspin_en_spinnenweb,_RP-P-1944-2688.jpg",
             "source_url": "https://upload.wikimedia.org/wikipedia/commons/d/d0/Titelhoofd_met_kruisspin_en_spinnenweb%2C_RP-P-1944-2688.jpg",
             "source": "Rijksmuseum, Amsterdam",
-            "tones": [
-                "paper",
-                "navy"
-            ],
+            "tones": ["paper", "navy"],
             "crop": {
                 "x": 0.075,
                 "y": 0.13,

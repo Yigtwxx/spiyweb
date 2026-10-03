@@ -1,0 +1,174 @@
+---
+/* Using spiyweb from Python, in the three steps a newcomer actually takes:
+   install, point it at a folder of documents, ask from code. The point is that
+   nobody needs a retrieval library of their own first: a directory of .txt and
+   .md files is enough, and the output is plain text for any model. */
+import { libraryIndex, libraryInstall, librarySnippet } from '../data/commands';
+import SketchArrow from './sketch/SketchArrow.astro';
+import { highlightPython, highlightShell } from '../lib/highlight';
+
+const steps = [
+    {
+        n: '01',
+        title: 'Install it',
+        body: 'The core is pure Python with no dependencies; the index-time extras bring the embedding model, spaCy and FAISS.',
+        file: 'terminal',
+        code: libraryInstall,
+    },
+    {
+        n: '02',
+        title: 'Point it at your documents',
+        body: 'A folder of .txt or .md files is enough: no vector database, no schema, no code. It embeds, extracts entities and spins the graph.',
+        file: 'terminal',
+        code: libraryIndex,
+    },
+] as const;
+---
+
+<div class="lib">
+    <ol class="lib__steps">
+        {steps.map((s) => (
+            <li class="lib__step">
+                <p class="lib__n" aria-hidden="true">
+                    {s.n}
+                </p>
+                <h3 class="lib__title">{s.title}</h3>
+                <p class="lib__body">{s.body}</p>
+                <figure class="lib__code">
+                    <figcaption class="lib__file">{s.file}</figcaption>
+                    <pre tabindex="0"><code set:html={highlightShell(s.code)} /></pre>
+                </figure>
+            </li>
+        ))}
+    </ol>
+    <div class="lib__main">
+        <p class="lib__n" aria-hidden="true">
+            03
+        </p>
+        <h3 class="lib__title">
+            <code class="lib__import">import spiyweb</code> and ask
+        </h3>
+        <p class="lib__body">
+            One call returns the passages the web lit up, ranked by energy, with how many sources
+            voted for each and how sure it is overall. Paste them into whatever model you already
+            use: the retrieval is the library's job, the answer stays yours.
+        </p>
+        <figure class="lib__code lib__code--main">
+            <figcaption class="lib__file">app.py</figcaption>
+            <pre tabindex="0"><code set:html={highlightPython(librarySnippet)} /></pre>
+        </figure>
+        <div class="lib__note">
+            <SketchArrow direction="curve-left" size={52} />
+            <p class="marginalia">
+                No k to tune, no retriever to build. Every query it answers can also play live in
+                the monitor just below.
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .lib {
+        display: grid;
+        gap: var(--space-7);
+    }
+    @media (min-width: 64rem) {
+        .lib {
+            grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+            gap: var(--space-8);
+            align-items: start;
+        }
+    }
+    .lib__steps {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: var(--space-6);
+    }
+    .lib__step,
+    .lib__main {
+        display: grid;
+        gap: var(--space-3);
+        min-width: 0;
+    }
+    .lib__n {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: var(--step-4);
+        line-height: 1;
+        color: var(--azure);
+        font-variation-settings:
+            'opsz' 96,
+            'WONK' 1;
+    }
+    .lib__title {
+        margin: 0;
+        font-size: var(--step-2);
+    }
+    .lib__import {
+        font-size: 0.85em;
+        background: var(--ice);
+        color: var(--azure-deep);
+        padding: 0.05em 0.35em;
+    }
+    .lib__body {
+        margin: 0;
+        color: var(--ink-soft);
+    }
+    .lib__code {
+        margin: var(--space-2) 0 0;
+        background: var(--tui-bg);
+        color: var(--tui-fg);
+        border-radius: 6px;
+        overflow: hidden;
+        min-width: 0;
+        box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--frost) 40%, transparent),
+            0 18px 40px -26px color-mix(in srgb, var(--navy) 70%, transparent);
+    }
+    .lib__file {
+        padding: 0.45em 1em;
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        color: var(--tui-dim);
+        border-bottom: 1px solid color-mix(in srgb, var(--tui-fg) 12%, transparent);
+    }
+    .lib__code pre {
+        padding: var(--space-3) var(--space-4);
+        font-size: 0.8rem;
+        line-height: 1.65;
+    }
+    .lib__code--main pre {
+        font-size: 0.84rem;
+    }
+    .lib__code :global(.hl-k) {
+        color: #9fd6ec;
+    }
+    .lib__code :global(.hl-s) {
+        color: #f2d48a;
+    }
+    .lib__code :global(.hl-c) {
+        color: var(--tui-dim);
+        font-style: italic;
+    }
+    .lib__code :global(.hl-f) {
+        color: #9ee6c4;
+    }
+    .lib__code :global(.hl-p) {
+        color: var(--tui-dim);
+    }
+    .lib__note {
+        display: flex;
+        gap: var(--space-2);
+        align-items: flex-start;
+        margin-top: var(--space-3);
+    }
+    .lib__note :global(svg) {
+        flex: none;
+    }
+    .lib__note .marginalia {
+        margin: 0;
+        max-width: 40ch;
+    }
+</style>

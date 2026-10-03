@@ -62,3 +62,22 @@ export const siblings: readonly { name: string; href: string; tag: string }[] = 
         tag: 'a security scanner that follows the scent, not the checklist',
     },
 ];
+
+/* Using it as a library: three steps from a folder of documents to context for
+   whichever model the caller already uses. No index of your own needed. */
+export const libraryInstall = `pip install "spiyweb[index]"
+python -m spacy download en_core_web_sm`;
+
+export const libraryIndex = `spiyweb index docs/ my-index`;
+
+export const librarySnippet = `import spiyweb
+
+with spiyweb.open_index("my-index") as index:
+    answer = index.retrieve("who signed off on the release?")
+
+# The web stopped itself; hand what it found to any LLM.
+context = "\\n\\n".join(p.text for p in answer.passages)
+
+for p in answer.passages:
+    print(f"{p.energy:5.2f}  {p.votes} votes  {p.source_id}")
+print(answer.confidence)  # how sure it is: energy, nodes, hop depth`;

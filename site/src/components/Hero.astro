@@ -32,10 +32,17 @@ import { version } from '../data/commands';
                 anywhere.
             </p>
             <InstallBox tone="paper" id="hero-install" />
+            <a class="hero__cta" href="#python">
+                <code>import spiyweb</code>
+                <span>use it from Python in three steps</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 4 V19 M6 13 L12 19 L18 13" />
+                </svg>
+            </a>
             <p class="hero__fine">
-                Python 3.11+ on Windows, macOS and Linux. <code>pip install spiyweb</code> pulls in
-                nothing: the core is pure Python. Then type <code>spiyweb</code> and watch your
-                app's queries spread.
+                A Python library: <code>import spiyweb</code>, point it at a folder of documents,
+                ask. Python 3.11+ on Windows, macOS and Linux; the core pulls in nothing. Type{' '}
+                <code>spiyweb</code> to watch your app's queries spread.
             </p>
         </div>
         <figure class="hero__figure">
@@ -86,6 +93,55 @@ import { version } from '../data/commands';
         width: 100%;
         height: 100%;
         z-index: -1;
+    }
+    /* The way in for most readers: the library, not the monitor. */
+    .hero__cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.7em;
+        margin-top: var(--space-4);
+        padding: 0.55em 0.9em 0.55em 0.6em;
+        border-radius: 999px;
+        background: var(--frost);
+        color: var(--navy-deep);
+        font-weight: 500;
+        text-decoration: none;
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--frost) 22%, transparent);
+        transition:
+            transform 320ms var(--ease-silk),
+            box-shadow 320ms var(--ease-silk);
+    }
+    .hero__cta code {
+        background: var(--navy);
+        color: var(--frost-soft);
+        padding: 0.2em 0.6em;
+        border-radius: 999px;
+        font-size: 0.9em;
+    }
+    .hero__cta svg {
+        width: 1.1em;
+        height: 1.1em;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+    .hero__cta:hover {
+        color: var(--navy-deep);
+        text-decoration: none;
+        transform: translateY(-2px);
+        box-shadow: 0 0 0 6px color-mix(in srgb, var(--frost) 30%, transparent);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        .hero__cta:hover svg {
+            animation: cta-nudge 900ms var(--ease-silk) infinite;
+        }
+    }
+    @keyframes cta-nudge {
+        50% {
+            transform: translateY(3px);
+        }
     }
     .hero__toggle {
         margin-top: var(--space-3);
@@ -177,8 +233,11 @@ import { version } from '../data/commands';
         :global(.js) .hero__copy > :global(.install) {
             animation-delay: 700ms;
         }
+        :global(.js) .hero__cta {
+            animation-delay: 820ms;
+        }
         :global(.js) .hero__fine {
-            animation-delay: 860ms;
+            animation-delay: 940ms;
         }
         :global(.js) .hero__caption,
         :global(.js) .hero__toggle {

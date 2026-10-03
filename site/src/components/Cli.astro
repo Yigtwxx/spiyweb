@@ -3,6 +3,7 @@
    bare command behaves where nobody can answer it, and the library call the CLI
    is a face of. */
 import { cliCommands, snippet, surfaces } from '../data/commands';
+import { highlightPython } from '../lib/highlight';
 import Halftone from './Halftone.astro';
 import SketchBox from './sketch/SketchBox.astro';
 import SketchArrow from './sketch/SketchArrow.astro';
@@ -64,7 +65,7 @@ import SketchArrow from './sketch/SketchArrow.astro';
                 tabindex="0"
                 role="region"
                 aria-label="Python example: open an index and retrieve"
-            ><code>{snippet}</code></pre>
+            ><code set:html={highlightPython(snippet)} /></pre>
         </figure>
         <figure class="ci__plate">
             <Halftone
@@ -195,6 +196,19 @@ import SketchArrow from './sketch/SketchArrow.astro';
         color: var(--tui-dim);
         padding: 0.6em 1em;
         border-bottom: 1px solid color-mix(in srgb, var(--tui-fg) 12%, transparent);
+    }
+    .ci__workflow :global(.hl-k) {
+        color: #9fd6ec;
+    }
+    .ci__workflow :global(.hl-s) {
+        color: #f2d48a;
+    }
+    .ci__workflow :global(.hl-c) {
+        color: var(--tui-dim);
+        font-style: italic;
+    }
+    .ci__workflow :global(.hl-f) {
+        color: #9ee6c4;
     }
     .ci__workflow pre {
         padding: var(--space-4);

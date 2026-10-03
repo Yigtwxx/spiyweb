@@ -7,6 +7,7 @@ import { repo } from '../data/commands';
 import Logo from './Logo.astro';
 
 const links = [
+    { href: '#python', label: 'Python' },
     { href: '#watch', label: 'Watch' },
     { href: '#web', label: 'How it spreads' },
     { href: '#trace', label: 'The trace' },
@@ -212,12 +213,13 @@ const links = [
     }
     @media (max-width: 56rem) {
         .nav__links [href='#trace'],
+        .nav__links [href='#web'],
         .nav__links [href='#rules'] {
             display: none;
         }
     }
     @media (max-width: 40rem) {
-        .nav__links [data-nav]:not([href='#watch']) {
+        .nav__links [data-nav]:not([href='#python']) {
             display: none;
         }
     }

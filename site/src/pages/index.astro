@@ -12,6 +12,7 @@ import Rules from '../components/Rules.astro';
 import Measured from '../components/Measured.astro';
 import Limits from '../components/Limits.astro';
 import Cli from '../components/Cli.astro';
+import Library from '../components/Library.astro';
 import Footer from '../components/Footer.astro';
 import SketchArrow from '../components/sketch/SketchArrow.astro';
 import { chapters } from '../data/chapters';
@@ -50,6 +51,16 @@ const notes = [
         <Hero />
     </div>
     <main id="main">
+        <Section
+            id="python"
+            field="ice"
+            exhibit="Start here"
+            title="Three steps, then import spiyweb."
+            margin="You do not need a retrieval library of your own. A folder of documents is enough."
+        >
+            <Library />
+        </Section>
+
         <Section id="watch" exhibit="Plate I" title="A query, as it spreads.">
             <div class="run" data-run>
                 <Terminal />
