@@ -1,0 +1,241 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Hero from '../components/Hero.astro';
+import Section from '../components/Section.astro';
+import Terminal from '../components/Terminal.astro';
+import Chapter from '../components/Chapter.astro';
+import Trace from '../components/Trace.astro';
+import Compare from '../components/Compare.astro';
+import Honesty from '../components/Honesty.astro';
+import Rules from '../components/Rules.astro';
+import Measured from '../components/Measured.astro';
+import Limits from '../components/Limits.astro';
+import Cli from '../components/Cli.astro';
+import Footer from '../components/Footer.astro';
+import SketchArrow from '../components/sketch/SketchArrow.astro';
+import { chapters } from '../data/chapters';
+
+const title = 'spiyweb — Not top-k. The whole web.';
+const description =
+    'spiyweb is graph-based retrieval for RAG: your query enters a graph of passages as an energy seed and spreads with decay, so evidence that is only connected through other passages still reaches the answer. Duplicates become votes, the web stops itself, and every answer says how sure it is. Pure Python, zero dependencies.';
+
+const notes = [
+    {
+        id: 'welcome',
+        text: 'Bare spiyweb takes the window over. Nothing is asked; it listens.',
+    },
+    {
+        id: 'attach',
+        text: 'Your app runs in the next terminal. No socket, no server: the monitor tails a file the library writes.',
+    },
+    {
+        id: 'vote',
+        text: 'A near-copy of the top passage is cut. It comes back as a vote, not a second slot.',
+    },
+    {
+        id: 'converge',
+        text: 'Two weak paths meet at email#113. It was never in the top two; it finishes third.',
+    },
+    {
+        id: 'stop',
+        text: 'Nobody asked for five. The next hop would have carried too little, so the web stopped.',
+    },
+];
+---
+
+<Layout title={title} description={description}>
+    <Nav />
+    <div class="hero-shell" data-nav-hero>
+        <Hero />
+    </div>
+    <main id="main">
+        <Section id="watch" exhibit="Plate I" title="A query, as it spreads.">
+            <div class="run" data-run>
+                <Terminal />
+                <aside class="run__notes" aria-label="What to look at in the run" data-run-notes>
+                    <p class="marginalia run__lede" data-run-lede>
+                        A team wiki, a changelog and meeting minutes. One question nobody wrote down
+                        in a single place.
+                    </p>
+                    {notes.map((n) => (
+                        <div class="run__note" data-note-for={n.id}>
+                            <SketchArrow direction="curve-left" size={56} />
+                            <p class="marginalia">{n.text}</p>
+                        </div>
+                    ))}
+                </aside>
+            </div>
+        </Section>
+
+        <Section
+            id="web"
+            exhibit="File 01"
+            title="Seed. Spread. Converge. Stop."
+            margin="Top-k ends when it has k. The web ends when the energy does."
+        >
+            {chapters.map((chapter) => (
+                <Chapter chapter={chapter} />
+            ))}
+        </Section>
+
+        <Section
+            id="trace"
+            field="ice"
+            exhibit="File 02"
+            title="The canonical trace."
+            margin="D is never the passage most like the question, and it ranks third. That gap is the whole idea."
+        >
+            <Trace />
+        </Section>
+
+        <Section
+            id="different"
+            exhibit="File 03"
+            field="navy"
+            title="What top-k cannot see."
+            margin="Keep plain top-k for lookups. This is for answers spread across passages."
+        >
+            <Compare />
+        </Section>
+
+        <Section
+            id="honesty"
+            exhibit="File 04"
+            title="It can say “I don’t know.”"
+            margin="A retriever that cannot say how sure it is leaves the guessing to the model."
+        >
+            <Honesty />
+        </Section>
+
+        <Section
+            id="rules"
+            field="ice"
+            exhibit="File 05"
+            title="Six things the web will never do."
+            margin="Settled before the first benchmark. A better score does not reopen them."
+        >
+            <Rules />
+        </Section>
+
+        <Section
+            id="measured"
+            exhibit="File 06"
+            field="navy"
+            title="Measured on multi-hop."
+            margin="Against plain top-k and against iterative retrieval, the stronger baseline. 1000 questions a run."
+        >
+            <Measured />
+        </Section>
+
+        <Section
+            id="limits"
+            exhibit="File 07"
+            title="Where the web thins."
+            margin="A retriever that explains itself also has to say where its threads give out."
+        >
+            <Limits />
+        </Section>
+
+        <Section
+            id="cli"
+            field="ice"
+            exhibit="File 08"
+            title="The same web, behind a pipe."
+            margin="No screen needed: the monitor's verbs work in scripts, and the library under them is three lines."
+        >
+            <Cli />
+        </Section>
+    </main>
+    <Footer />
+</Layout>
+
+<script>
+    import { initRunNotes } from '../scripts/run-notes';
+    initRunNotes();
+</script>
+
+<style>
+    .hero-shell {
+        --field: var(--navy);
+        background: var(--navy);
+        color: var(--paper);
+    }
+    main {
+        position: relative;
+    }
+    /* Two columns only from 80rem: narrower, the notes column is too slim for each
+       note to sit beside its own lines, so they go under the terminal instead. */
+    .run {
+        display: grid;
+        gap: var(--space-5);
+        align-items: start;
+    }
+    @media (min-width: 80rem) {
+        .run {
+            grid-template-columns: minmax(0, 1fr) var(--margin-col);
+            gap: var(--space-6);
+        }
+    }
+    .run__notes {
+        display: grid;
+        gap: var(--space-5);
+        padding-top: var(--space-6);
+    }
+    @media (min-width: 80rem) {
+        .run__notes {
+            grid-template-rows: repeat(6, auto);
+            align-content: space-between;
+            height: 100%;
+        }
+    }
+    .run__note {
+        display: flex;
+        gap: var(--space-2);
+        align-items: flex-start;
+    }
+    .run__note .marginalia,
+    .run__lede {
+        margin: 0;
+    }
+    /* The arrow keeps its size: a long note would otherwise squeeze it to a tick. */
+    .run__note :global(.sketch-arrow) {
+        flex: none;
+    }
+    /* scripts/run-notes.ts: each note pinned beside the line it points at, shown
+       once that line has been typed. */
+    @media (min-width: 80rem) {
+        .run--anchored .run__notes {
+            display: block;
+            position: relative;
+            height: auto;
+            padding-top: 0;
+        }
+        .run--anchored .run__note {
+            position: absolute;
+            inset-inline: 0;
+            top: var(--note-top, 0);
+            opacity: 0;
+            transition:
+                opacity 400ms ease,
+                top 300ms ease;
+        }
+        .run--anchored .run__note.is-shown {
+            opacity: 1;
+        }
+        /* A little smaller than elsewhere, so each note is short enough to sit on
+           its own lines without covering its neighbour's. */
+        .run--anchored .run__note :global(.sketch-arrow) {
+            width: 2.5rem;
+            height: 2.5rem;
+        }
+        .run--anchored .run__note .marginalia {
+            font-size: var(--step--1);
+        }
+    }
+    @media (min-width: 80rem) and (prefers-reduced-motion: reduce) {
+        .run--anchored .run__note {
+            transition: none;
+        }
+    }
+</style>

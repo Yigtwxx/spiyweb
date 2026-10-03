@@ -1,0 +1,216 @@
+---
+/* The install command with a tab per tool and a copy button.
+   Works without JS: every command is in the markup, the first is shown. */
+import { install } from '../data/commands';
+interface Props {
+    tone?: 'paper' | 'ink';
+    id?: string;
+}
+const { tone = 'ink', id = 'install-box' } = Astro.props;
+---
+
+<div class:list={['install', `install--${tone}`]} data-install>
+    <div class="install__tabs" role="tablist" aria-label="Install with">
+        {install.map((opt, i) => (
+            <button
+                class="install__tab"
+                role="tab"
+                type="button"
+                id={`${id}-tab-${opt.label}`}
+                aria-selected={i === 0 ? 'true' : 'false'}
+                aria-controls={`${id}-panel-${opt.label}`}
+                tabindex={i === 0 ? 0 : -1}
+                data-tab={opt.label}
+            >
+                {opt.label}
+            </button>
+        ))}
+    </div>
+    {install.map((opt, i) => (
+        <div
+            class="install__panel"
+            role="tabpanel"
+            id={`${id}-panel-${opt.label}`}
+            aria-labelledby={`${id}-tab-${opt.label}`}
+            hidden={i !== 0}
+            data-panel={opt.label}
+        >
+            <pre class="install__cmd"><span class="install__prompt" aria-hidden="true">$ </span><code>{opt.cmd}</code></pre>
+            <button
+                class="install__copy"
+                type="button"
+                data-copy={opt.cmd}
+                aria-label={`Copy "${opt.cmd}"`}
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M8 8 L 8 4.5 L 19.5 4 L 20 15.5 L 16 16" />
+                    <path d="M4 8.5 L 15.5 8 L 16 19.5 L 4.5 20 Z" />
+                </svg>
+                <span class="install__copy-label" data-copy-label>
+                    copy
+                </span>
+            </button>
+        </div>
+    ))}
+    <svg
+        class="install__frame"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        focusable="false"
+    >
+        <path d="M2 2.4 L98 1.6 L98.5 98 L1.5 98.5 Z" />
+        <path class="install__frame-echo" d="M1.2 3.2 L97.4 2.8 L97.8 97.2 L2.6 97.6 Z" />
+    </svg>
+</div>
+
+<style>
+    .install {
+        position: relative;
+        isolation: isolate;
+        --frame: var(--ink);
+        --frame-fill: var(--paper-deep);
+        --tab-active: var(--navy);
+        color: var(--ink);
+        padding: var(--space-3) var(--space-4) var(--space-4);
+        max-width: 34rem;
+    }
+    .install--paper {
+        --frame: var(--paper);
+        --frame-fill: color-mix(in srgb, var(--ink) 30%, transparent);
+        --tab-active: var(--paper);
+        color: var(--paper);
+    }
+    .install__frame {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        overflow: visible;
+        filter: url(#pencil);
+    }
+    .install__frame path {
+        fill: var(--frame-fill);
+        stroke: var(--frame);
+        stroke-width: var(--stroke);
+        vector-effect: non-scaling-stroke;
+        stroke-linejoin: round;
+    }
+    .install__frame-echo {
+        fill: none !important;
+        opacity: 0.4;
+    }
+    .install__tabs {
+        display: flex;
+        gap: var(--space-4);
+        margin-bottom: var(--space-3);
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+    }
+    .install__tab {
+        background: none;
+        border: 0;
+        padding: 0.1rem 0;
+        cursor: pointer;
+        color: inherit;
+        opacity: 0.6;
+        border-bottom: var(--stroke-bold) solid transparent;
+    }
+    .install__tab[aria-selected='true'] {
+        opacity: 1;
+        border-bottom-color: var(--tab-active);
+    }
+    .install__panel[hidden] {
+        display: none;
+    }
+    .install__panel {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+    }
+    .install__cmd {
+        font-size: var(--step-0);
+        white-space: pre;
+    }
+    .install__prompt {
+        opacity: 0.5;
+    }
+    .install__copy {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        color: inherit;
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        padding: 0.25rem 0.4rem;
+        opacity: 0.8;
+    }
+    .install__copy:hover {
+        opacity: 1;
+    }
+    .install__copy svg {
+        width: 1.1rem;
+        height: 1.1rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linejoin: round;
+        filter: url(#pencil-soft);
+    }
+</style>
+
+<script>
+    /* Tabs + copy. Progressive: without this script the first tab is visible and
+     the command is selectable text. */
+    for (const root of document.querySelectorAll<HTMLElement>('[data-install]')) {
+        const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-tab]'));
+        const panels = Array.from(root.querySelectorAll<HTMLElement>('[data-panel]'));
+        const select = (name: string) => {
+            for (const t of tabs) {
+                const on = t.dataset.tab === name;
+                t.setAttribute('aria-selected', on ? 'true' : 'false');
+                t.tabIndex = on ? 0 : -1;
+            }
+            for (const p of panels) p.hidden = p.dataset.panel !== name;
+        };
+        tabs.forEach((tab, i) => {
+            tab.addEventListener('click', () => select(tab.dataset.tab ?? ''));
+            tab.addEventListener('keydown', (e) => {
+                const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+                if (!dir) return;
+                e.preventDefault();
+                const next = tabs[(i + dir + tabs.length) % tabs.length];
+                next?.focus();
+                select(next?.dataset.tab ?? '');
+            });
+        });
+        for (const btn of root.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+            const label = btn.querySelector<HTMLElement>('[data-copy-label]');
+            btn.addEventListener('click', async () => {
+                const text = btn.dataset.copy ?? '';
+                try {
+                    await navigator.clipboard.writeText(text);
+                    if (label) label.textContent = 'copied';
+                } catch {
+                    const code = btn.parentElement?.querySelector('code');
+                    if (code) {
+                        const range = document.createRange();
+                        range.selectNodeContents(code);
+                        getSelection()?.removeAllRanges();
+                        getSelection()?.addRange(range);
+                    }
+                    if (label) label.textContent = 'select and copy';
+                }
+                setTimeout(() => {
+                    if (label) label.textContent = 'copy';
+                }, 1800);
+            });
+        }
+    }
+</script>

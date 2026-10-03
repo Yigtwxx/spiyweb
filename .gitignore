@@ -37,6 +37,8 @@ venv/
 
 # Data, indexes, experiment output
 data/
+# ...but the landing page's typed content lives in site/src/data/.
+!site/src/data/
 *.faiss
 *.npy
 runs/
@@ -47,3 +49,8 @@ runs/
 
 # Built by examples/hello_web.py wherever it is run
 hello-index/
+
+# Impeccable design-hook state (the landing page under site/)
+.impeccable/hook.cache.json
+.impeccable/config.local.json
+site/.impeccable/

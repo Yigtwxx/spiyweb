@@ -1,0 +1,184 @@
+---
+/* Top-k, iterative retrieval and the web as one ledger on the navy field: a row
+   per question, a column per method, spiyweb's column lit in frost like a thread
+   catching light. On a phone each row becomes a card; the explicit roles keep it
+   a table for a screen reader after `display` changes. */
+import { approaches, rows } from '../data/compare';
+---
+
+<div class="compare">
+    <table class="compare__table" role="table">
+        <caption class="visually-hidden">
+            How spiyweb compares with plain top-k and iterative retrieval
+        </caption>
+        <thead role="rowgroup">
+            <tr role="row">
+                <td class="compare__corner" role="cell"></td>
+                {approaches.map((a) => (
+                    <th
+                        scope="col"
+                        role="columnheader"
+                        class:list={['compare__col', { 'compare__col--web': a.id === 'web' }]}
+                    >
+                        <span class="compare__name">{a.name}</span>
+                        <span class="compare__kind">{a.kind}</span>
+                    </th>
+                ))}
+            </tr>
+        </thead>
+        <tbody role="rowgroup">
+            {rows.map((r) => (
+                <tr role="row" class="compare__row">
+                    <th scope="row" role="rowheader" class="compare__label">
+                        {r.label}
+                    </th>
+                    {approaches.map((a) => (
+                        <td
+                            role="cell"
+                            data-label={a.name}
+                            class:list={['compare__cell', { 'compare__cell--web': a.id === 'web' }]}
+                        >
+                            {r.cells[a.id]}
+                        </td>
+                    ))}
+                </tr>
+            ))}
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .compare {
+        --web-wash: color-mix(in srgb, var(--frost) 14%, var(--navy));
+        --rule: color-mix(in srgb, var(--frost-soft) 28%, transparent);
+    }
+    .compare__table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--step--1);
+    }
+
+    /* A phone: every row a card, its label on top and each tool's answer under
+       its name. */
+    .compare__table thead {
+        display: none;
+    }
+    .compare__table,
+    .compare__table tbody,
+    .compare__table tr,
+    .compare__table th,
+    .compare__table td {
+        display: block;
+    }
+    .compare__row {
+        padding-block: var(--space-4);
+        border-top: 1px dashed var(--rule);
+    }
+    .compare__label {
+        font-family: var(--font-display);
+        font-size: var(--step-1);
+        font-weight: 500;
+        text-align: left;
+        margin-bottom: var(--space-2);
+    }
+    .compare__table .compare__cell {
+        display: grid;
+        grid-template-columns: 8.5rem minmax(0, 1fr);
+        gap: var(--space-3);
+        padding: 0.35em 0;
+        color: color-mix(in srgb, var(--paper) 78%, transparent);
+    }
+    .compare__cell::before {
+        content: attr(data-label);
+        font-family: var(--font-type);
+        color: var(--frost);
+    }
+    .compare__table .compare__cell--web {
+        color: var(--paper);
+        background: var(--web-wash);
+        padding-inline: var(--space-2);
+        margin-inline: calc(var(--space-2) * -1);
+        border-radius: 2px;
+    }
+    .compare__cell--web::before {
+        color: var(--frost);
+    }
+
+    /* Wide enough for the ledger: a real grid of rows and columns. */
+    @media (min-width: 48rem) {
+        .compare__table {
+            display: table;
+            table-layout: fixed;
+        }
+        .compare__table thead {
+            display: table-header-group;
+        }
+        .compare__table tbody {
+            display: table-row-group;
+        }
+        .compare__table tr {
+            display: table-row;
+        }
+        .compare__table th,
+        .compare__table td,
+        .compare__table .compare__cell {
+            display: table-cell;
+        }
+        .compare__corner {
+            width: 20%;
+        }
+        .compare__col {
+            text-align: left;
+            vertical-align: bottom;
+            padding: 0 var(--space-4) var(--space-3);
+            border-bottom: 1.5px solid var(--frost-soft);
+        }
+        .compare__name {
+            display: block;
+            font-family: var(--font-display);
+            font-size: var(--step-1);
+            font-weight: 500;
+            line-height: 1.2;
+        }
+        .compare__kind {
+            display: block;
+            margin-top: 0.3em;
+            font-family: var(--font-type);
+            font-weight: 400;
+            color: var(--frost);
+        }
+        .compare__col--web {
+            background: var(--web-wash);
+            border-bottom-color: var(--frost);
+            padding-top: var(--space-4);
+        }
+        .compare__col--web .compare__name {
+            color: var(--frost);
+        }
+        .compare__row {
+            border-top: 0;
+        }
+        .compare__label,
+        .compare__table .compare__cell {
+            vertical-align: top;
+            padding: var(--space-3) var(--space-4) var(--space-3) 0;
+            border-bottom: 1px dashed var(--rule);
+        }
+        .compare__label {
+            font-size: var(--step-0);
+            margin: 0;
+        }
+        .compare__table .compare__cell {
+            padding-left: var(--space-4);
+            margin: 0;
+            border-radius: 0;
+        }
+        .compare__table .compare__cell::before {
+            content: none;
+        }
+        .compare__table .compare__cell--web {
+            padding-inline: var(--space-4);
+            margin-inline: 0;
+        }
+    }
+</style>

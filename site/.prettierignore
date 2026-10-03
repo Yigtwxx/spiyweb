@@ -1,0 +1,7 @@
+dist
+.astro
+node_modules
+public/images
+public/og.png
+src/data/images.generated.ts
+package-lock.json

@@ -1,0 +1,204 @@
+---
+/* The same web behind a pipe: the monitor's verbs as plain commands, how the
+   bare command behaves where nobody can answer it, and the library call the CLI
+   is a face of. */
+import { cliCommands, snippet, surfaces } from '../data/commands';
+import Halftone from './Halftone.astro';
+import SketchBox from './sketch/SketchBox.astro';
+import SketchArrow from './sketch/SketchArrow.astro';
+---
+
+<div class="ci">
+    <div class="ci__main">
+        <SketchBox padding="md" draw class="ci__commands">
+            <div class="ci__pre" role="figure" aria-label="Command examples" tabindex="0">
+                {cliCommands.map((c) => (
+                    <div class="ci__line">
+                        <span class="ci__prompt" aria-hidden="true">
+                            $&nbsp;
+                        </span>
+                        <span class="ci__cmd">{c.cmd}</span>
+                        <span class="ci__comment">{`# ${c.comment}`}</span>
+                    </div>
+                ))}
+            </div>
+        </SketchBox>
+        <div class="ci__exit">
+            <div class="ci__exit-arrow">
+                <SketchArrow direction="curve-down" size={52} />
+                <p class="marginalia">
+                    bare <code>spiyweb</code>, depending on where it runs
+                </p>
+            </div>
+            <table class="ci__table">
+                <caption class="visually-hidden">How the bare command behaves</caption>
+                <tbody>
+                    {surfaces.map((e) => (
+                        <tr>
+                            <th scope="row">{e.where}</th>
+                            <td>{e.what}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+        <div class="ci__prose">
+            <p>
+                <code>lint</code> is the diagnostic that needs no query: it reads the graph's shape
+                and reports islands nothing bridges, hubs that grind arriving energy into dust,
+                near-identical passages that will compete for one seed slot, and{' '}
+                <em class="key">edge layers that came out empty</em>, so a corpus problem is not
+                mistaken for a retrieval one.
+            </p>
+            <p>
+                Every query an open index answers is recorded as a self-contained trace: the lit
+                subgraph, the passages, the energy ledger and the settings it ran with.{' '}
+                <code>load_traces()</code> reads it back on a machine that holds no index at all.
+            </p>
+        </div>
+    </div>
+    <div class="ci__side">
+        <figure class="ci__workflow">
+            <figcaption class="ci__file">app.py</figcaption>
+            <pre
+                tabindex="0"
+                role="region"
+                aria-label="Python example: open an index and retrieve"
+            ><code>{snippet}</code></pre>
+        </figure>
+        <figure class="ci__plate">
+            <Halftone
+                id="graag"
+                tone="paper"
+                hover="azure"
+                drift
+                sizes="(min-width: 64rem) 22rem, 80vw"
+            />
+            <figcaption class="caption ci__caption">
+                Julie de Graag, <cite>Spider in a web</cite>, 1918. The same web, cut in wood.
+            </figcaption>
+        </figure>
+    </div>
+</div>
+
+<style>
+    .ci {
+        display: grid;
+        gap: var(--space-7);
+    }
+    @media (min-width: 64rem) {
+        .ci {
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+            gap: var(--space-7);
+            align-items: start;
+        }
+    }
+    .ci__main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-6);
+    }
+    .ci__pre {
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        line-height: 1.6;
+        overflow-x: auto;
+    }
+    .ci__line {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        padding-block: 0.25em;
+    }
+    .ci__cmd {
+        white-space: nowrap;
+    }
+    .ci__comment {
+        grid-column: 2;
+        color: var(--ink-mute);
+    }
+    .ci__prompt {
+        color: var(--ink-mute);
+    }
+    .ci__exit {
+        display: grid;
+        gap: var(--space-4);
+    }
+    @media (min-width: 48rem) {
+        .ci__exit {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+            align-items: center;
+        }
+    }
+    .ci__exit-arrow {
+        display: flex;
+        gap: var(--space-2);
+        align-items: flex-start;
+    }
+    .ci__exit-arrow :global(svg) {
+        flex: none;
+    }
+    .ci__exit-arrow .marginalia {
+        margin: 0;
+    }
+    .ci__table {
+        border-collapse: collapse;
+    }
+    .ci__table th,
+    .ci__table td {
+        text-align: left;
+        padding: var(--space-2) var(--space-3);
+        border-bottom: 1px dashed var(--paper-line);
+        vertical-align: top;
+    }
+    .ci__table th {
+        font-family: var(--font-type);
+        font-size: var(--step--1);
+        font-weight: 500;
+        color: var(--azure);
+    }
+    @media (min-width: 40rem) {
+        .ci__table th {
+            white-space: nowrap;
+        }
+    }
+    .ci__prose p {
+        color: var(--ink-soft);
+    }
+    /* min-width: 0 so the snippet's <pre> still scrolls inside its column. */
+    .ci__side {
+        display: grid;
+        /* minmax(0, 1fr), not auto: an auto track grows to the snippet's widest
+           line and pushes the phone page sideways instead of letting <pre> scroll. */
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-7);
+        min-width: 0;
+    }
+    .ci__plate {
+        margin: 0;
+        width: min(100%, 20rem);
+        justify-self: center;
+    }
+    .ci__caption {
+        margin-top: var(--space-3);
+    }
+    .ci__workflow {
+        margin: 0;
+        background: var(--tui-bg);
+        color: var(--tui-fg);
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: 0 24px 60px -30px color-mix(in srgb, var(--ink) 60%, transparent);
+    }
+    .ci__file {
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        color: var(--tui-dim);
+        padding: 0.6em 1em;
+        border-bottom: 1px solid color-mix(in srgb, var(--tui-fg) 12%, transparent);
+    }
+    .ci__workflow pre {
+        padding: var(--space-4);
+        font-size: 0.72rem;
+        line-height: 1.6;
+    }
+</style>

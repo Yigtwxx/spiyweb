@@ -1,0 +1,528 @@
+---
+/* The canonical trace, hop by hop: the seven-node graph from CLAUDE.md §2.6 with
+   a step control. Every stepped element lists the steps it is visible at in
+   `data-steps`, and the root's `data-step` picks one; the markup ships at the
+   last step, so without a script the finished web is what a reader sees.
+   scripts/trace-player.ts plays it once when it scrolls into view. */
+import { captions, edges, nodes, ranking, STEPS, type NodeId, type Step } from '../data/trace';
+import { mark } from '../lib/mark';
+
+const LAST: Step = 4;
+const from = (s: Step): string => STEPS.filter((k) => k >= s).join(' ');
+const only = (a: Step, b: Step): string => STEPS.filter((k) => k >= a && k <= b).join(' ');
+const byId = new Map(nodes.map((n) => [n.id, n]));
+const at = (id: NodeId): { x: number; y: number } => {
+    const n = byId.get(id);
+    return { x: n?.x ?? 0, y: n?.y ?? 0 };
+};
+/** Energy label spans: each value is visible until the next one replaces it. */
+const labels = nodes.flatMap((n) => {
+    const entries = (Object.entries(n.energy) as [string, number][])
+        .map(([s, e]) => [Number(s) as Step, e] as const)
+        .sort((p, q) => p[0] - q[0]);
+    return entries.map(([s, e], i) => ({
+        node: n,
+        text: n.id === 'Q' ? e.toFixed(1) : e.toFixed(3),
+        steps: only(s, ((entries[i + 1]?.[0] ?? LAST + 1) - 1) as Step),
+    }));
+});
+const radius = (id: NodeId): number => {
+    const n = byId.get(id);
+    const top = Math.max(0, ...Object.values(n?.energy ?? {}));
+    return n?.kind === 'seed' ? 22 : 11 + Math.sqrt(top) * 4.2;
+};
+const tableRows: { id: NodeId; label: string }[] = [
+    { id: 'A', label: 'A' },
+    { id: 'C', label: 'C' },
+    { id: 'D', label: 'D' },
+    { id: 'B', label: 'B' },
+    { id: 'F', label: 'F' },
+    { id: 'E', label: 'E' },
+    { id: 'Ad', label: 'A′' },
+];
+---
+
+<div class="trace" data-trace data-step={LAST}>
+    <figure class="trace__figure">
+        <svg
+            class="trace__web"
+            viewBox="0 0 620 350"
+            role="img"
+            aria-labelledby="trace-svg-title"
+            focusable="false"
+        >
+            <title id="trace-svg-title">
+                The canonical trace: seed Q reaches A and C, then B, D and E, then F. D is
+                reached by two paths and ranks third.
+            </title>
+            <g class="trace__edges">
+                {edges.map((e) => {
+                    const a = at(e.a);
+                    const b = at(e.b);
+                    const mx = (a.x + b.x) / 2;
+                    const my = (a.y + b.y) / 2;
+                    return (
+                        <g class:list={['trace__edge', e.kind && `trace__edge--${e.kind}`]}>
+                            <line class="trace__thread" x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+                            <line
+                                class="trace__flow"
+                                data-steps={from(e.lit)}
+                                data-lit={e.lit}
+                                x1={a.x}
+                                y1={a.y}
+                                x2={b.x}
+                                y2={b.y}
+                                pathLength="1"
+                            />
+                            <text class="trace__weight" x={mx} y={my - 6} text-anchor="middle">
+                                {e.kind === 'cut' ? '' : e.weight.toFixed(1)}
+                            </text>
+                            {e.kind === 'cut' ? (
+                                <text
+                                    class="trace__cut"
+                                    data-steps={from(e.lit)}
+                                    x={mx}
+                                    y={my + 5}
+                                    text-anchor="middle"
+                                >
+                                    ✂
+                                </text>
+                            ) : null}
+                        </g>
+                    );
+                })}
+                <line
+                    class="trace__stub"
+                    data-steps={from(4)}
+                    x1={at('F').x}
+                    y1={at('F').y}
+                    x2={at('F').x + 48}
+                    y2={at('F').y}
+                />
+            </g>
+            <g class="trace__nodes">
+                {nodes.map((n) => (
+                    <g
+                        class:list={['trace__node', n.kind && `trace__node--${n.kind}`]}
+                        data-from={n.from}
+                        data-cx={n.x}
+                        data-cy={n.y}
+                        data-r={radius(n.id)}
+                    >
+                        <circle class="trace__ring" cx={n.x} cy={n.y} r={radius(n.id)} />
+                        <circle
+                            class="trace__fill"
+                            data-steps={from(n.from)}
+                            cx={n.x}
+                            cy={n.y}
+                            r={radius(n.id)}
+                        />
+                        <text class="trace__label" x={n.x} y={n.y + 5} text-anchor="middle">
+                            {n.label}
+                        </text>
+                        {n.kind !== 'duplicate' && n.kind !== 'dies' ? (
+                            <text
+                                class="trace__label trace__label--lit"
+                                data-steps={from(n.from)}
+                                x={n.x}
+                                y={n.y + 5}
+                                text-anchor="middle"
+                                aria-hidden="true"
+                            >
+                                {n.label}
+                            </text>
+                        ) : null}
+                    </g>
+                ))}
+                {labels.map((l) => (
+                    <text
+                        class="trace__energy"
+                        data-steps={l.steps}
+                        x={l.node.x}
+                        y={l.node.y + radius(l.node.id) + 15}
+                        text-anchor="middle"
+                    >
+                        {l.text}
+                    </text>
+                ))}
+            </g>
+            <g class="trace__notes">
+                <text class="trace__note" data-steps={from(2)} x={at('A').x - 4} y={at('A').y - 30}>
+                    idea A: 2 votes
+                </text>
+                <text
+                    class="trace__note trace__note--dim"
+                    data-steps={from(2)}
+                    x={at('E').x + 26}
+                    y={at('E').y + 4}
+                >
+                    0.875 &lt; 1.5, dies
+                </text>
+                <text
+                    class="trace__note"
+                    data-steps={from(3)}
+                    x={at('D').x + 10}
+                    y={at('D').y - 34}
+                >
+                    ← A + C: converging
+                </text>
+                <text
+                    class="trace__note trace__note--dim"
+                    data-steps={from(4)}
+                    x={at('F').x - 18}
+                    y={at('F').y + 48}
+                >
+                    1.035 &lt; 1.5: stop
+                </text>
+            </g>
+        </svg>
+        <figcaption class="trace__captions">
+            {STEPS.map((s) => (
+                <p class="trace__caption" data-steps={String(s)} set:html={mark(captions[s])} />
+            ))}
+            <p class="visually-hidden" aria-live="polite" data-trace-live></p>
+        </figcaption>
+    </figure>
+
+    <div class="trace__side">
+        <div class="trace__controls" role="group" aria-label="Step through the trace">
+            <button type="button" class="trace__btn" data-trace-prev aria-label="Previous hop">
+                ←
+            </button>
+            <label class="trace__range">
+                <span class="trace__hop" data-trace-hop>
+                    hop 3 · stopped
+                </span>
+                <input
+                    type="range"
+                    min="0"
+                    max={LAST}
+                    step="1"
+                    value={LAST}
+                    data-trace-range
+                    aria-label="Step"
+                />
+            </label>
+            <button type="button" class="trace__btn" data-trace-next aria-label="Next hop">
+                →
+            </button>
+            <button type="button" class="trace__btn trace__btn--play" data-trace-play>
+                replay
+            </button>
+        </div>
+
+        <table class="trace__table">
+            <caption class="visually-hidden">Energy held by each node at the current step</caption>
+            <thead>
+                <tr>
+                    <th scope="col">node</th>
+                    <th scope="col">energy</th>
+                </tr>
+            </thead>
+            <tbody>
+                {tableRows.map((r) => {
+                    const n = byId.get(r.id);
+                    const own = labels.filter((l) => l.node.id === r.id);
+                    const lit = n?.from ?? LAST;
+                    return (
+                        <tr class:list={[n?.kind && `trace__row--${n.kind}`]}>
+                            <th scope="row">{r.label}</th>
+                            <td>
+                                <span data-steps={STEPS.filter((s) => s < lit).join(' ') || 'none'}>
+                                    ·
+                                </span>
+                                {r.id === 'Ad' ? (
+                                    <span data-steps={from(2)}>cut → vote for A</span>
+                                ) : null}
+                                {own.map((l) => (
+                                    <span data-steps={l.steps}>
+                                        {l.text}
+                                        {r.id === 'E' ? ' ✕' : ''}
+                                    </span>
+                                ))}
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+
+        <ol class="trace__ranking" data-steps={from(4)} aria-label="Final ranking">
+            {ranking.map((r) => (
+                <li>
+                    <span class="trace__rank-id">{r.id}</span>
+                    <span class="trace__rank-e">{r.energy.toFixed(3)}</span>
+                    {r.note ? <span class="trace__rank-note">{r.note}</span> : null}
+                </li>
+            ))}
+        </ol>
+    </div>
+</div>
+
+<script>
+    import { initTrace } from '../scripts/trace-player';
+    initTrace();
+</script>
+
+<style>
+    .trace {
+        display: grid;
+        gap: var(--space-6);
+        align-items: start;
+    }
+    @media (min-width: 64rem) {
+        .trace {
+            grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+            gap: var(--space-7);
+        }
+    }
+    .trace__figure {
+        margin: 0;
+    }
+    .trace__web {
+        width: 100%;
+        height: auto;
+        overflow: visible;
+        font-family: var(--font-mono);
+    }
+
+    /* The step rule: anything that lists steps hides at the steps it does not list.
+       One rule per step, written out because CSS cannot compare an attribute with
+       another element's attribute. */
+    [data-steps] {
+        transition: opacity 420ms var(--ease-pen);
+    }
+    .trace[data-step='0'] [data-steps]:not([data-steps~='0']),
+    .trace[data-step='1'] [data-steps]:not([data-steps~='1']),
+    .trace[data-step='2'] [data-steps]:not([data-steps~='2']),
+    .trace[data-step='3'] [data-steps]:not([data-steps~='3']),
+    .trace[data-step='4'] [data-steps]:not([data-steps~='4']) {
+        opacity: 0;
+    }
+    /* In the table and the caption the hidden values take no room. */
+    .trace[data-step='0'] :is(td, .trace__captions) [data-steps]:not([data-steps~='0']),
+    .trace[data-step='1'] :is(td, .trace__captions) [data-steps]:not([data-steps~='1']),
+    .trace[data-step='2'] :is(td, .trace__captions) [data-steps]:not([data-steps~='2']),
+    .trace[data-step='3'] :is(td, .trace__captions) [data-steps]:not([data-steps~='3']),
+    .trace[data-step='4'] :is(td, .trace__captions) [data-steps]:not([data-steps~='4']) {
+        display: none;
+    }
+
+    .trace__thread {
+        stroke: var(--paper-line);
+        stroke-width: 1.5;
+    }
+    .trace__edge--cut .trace__thread {
+        stroke-dasharray: 4 5;
+    }
+    /* Energy running along a thread: drawn from the end that fed it. */
+    .trace__flow {
+        stroke: var(--azure);
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 0;
+        transition:
+            stroke-dashoffset 700ms var(--ease-pen),
+            opacity 420ms var(--ease-pen);
+    }
+    .trace__edge--cut .trace__flow {
+        opacity: 0 !important;
+    }
+    .trace__edge--dies .trace__flow {
+        stroke: var(--slate-soft);
+        stroke-width: 2;
+    }
+    .trace[data-step='0'] .trace__flow:not([data-steps~='0']),
+    .trace[data-step='1'] .trace__flow:not([data-steps~='1']),
+    .trace[data-step='2'] .trace__flow:not([data-steps~='2']),
+    .trace[data-step='3'] .trace__flow:not([data-steps~='3']) {
+        stroke-dashoffset: 1;
+    }
+    /* scripts/trace-player.ts: the spark running along a thread, and the ring a
+       node throws when energy reaches it. */
+    .trace__web :global(.trace__spark) {
+        fill: var(--azure);
+        filter: drop-shadow(0 0 4px var(--frost));
+    }
+    .trace__web :global(.trace__pop) {
+        fill: none;
+        stroke: var(--azure);
+        stroke-width: 2;
+    }
+    .trace__weight {
+        fill: var(--ink-mute);
+        font-size: 11px;
+    }
+    .trace__cut {
+        fill: var(--azure);
+        font-size: 16px;
+    }
+    .trace__stub {
+        stroke: var(--slate-soft);
+        stroke-width: 2;
+        stroke-dasharray: 3 4;
+    }
+
+    .trace__ring {
+        fill: var(--paper);
+        stroke: var(--ink-mute);
+        stroke-width: 1.5;
+    }
+    .trace__fill {
+        fill: var(--navy);
+    }
+    .trace__node--seed .trace__fill {
+        fill: var(--azure);
+    }
+    .trace__node--dies .trace__fill {
+        fill: var(--slate-soft);
+    }
+    .trace__node--duplicate .trace__ring {
+        stroke-dasharray: 3 3;
+    }
+    .trace__node--duplicate .trace__fill {
+        display: none;
+    }
+    /* The bridge: once both paths have arrived, it wears a halo. */
+    .trace__node--bridge .trace__ring {
+        stroke: var(--azure);
+        stroke-width: 2;
+    }
+    .trace__label {
+        font-size: 14px;
+        font-weight: 500;
+        fill: var(--ink);
+        pointer-events: none;
+    }
+    .trace__label--lit {
+        fill: var(--paper);
+    }
+    .trace__energy {
+        font-size: 12px;
+        fill: var(--azure);
+        font-weight: 500;
+    }
+    .trace__note {
+        font-family: var(--font-hand);
+        font-size: 16px;
+        fill: var(--azure);
+    }
+    .trace__note--dim {
+        fill: var(--ink-mute);
+    }
+
+    .trace__captions {
+        margin-top: var(--space-4);
+        min-height: 4.5lh;
+    }
+    .trace__caption {
+        margin: 0;
+        max-width: 60ch;
+    }
+
+    .trace__side {
+        display: grid;
+        gap: var(--space-5);
+    }
+    .trace__controls {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+    }
+    .trace__range {
+        flex: 1;
+        display: grid;
+        gap: 0.2em;
+    }
+    .trace__hop {
+        color: var(--azure);
+        font-weight: 500;
+    }
+    .trace__range input {
+        width: 100%;
+        accent-color: var(--azure);
+    }
+    .trace__btn {
+        background: var(--paper);
+        border: 1px solid var(--ink);
+        border-radius: 2px;
+        padding: 0.25em 0.6em;
+        cursor: pointer;
+        box-shadow: 2px 2px 0 var(--paper-line);
+    }
+    .trace__btn:hover {
+        background: var(--frost-wash);
+    }
+    .trace__btn:active {
+        transform: translate(1px, 1px);
+        box-shadow: 1px 1px 0 var(--paper-line);
+    }
+    .trace__table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+    }
+    .trace__table th,
+    .trace__table td {
+        text-align: left;
+        padding: 0.35em 0.5em;
+        border-bottom: 1px dashed var(--paper-line);
+        font-weight: 400;
+    }
+    .trace__table thead th {
+        color: var(--ink-mute);
+        font-family: var(--font-type);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 0.85em;
+    }
+    .trace__table tbody th {
+        color: var(--azure);
+        font-weight: 500;
+        width: 3em;
+    }
+    .trace__row--dies td,
+    .trace__row--duplicate td {
+        color: var(--ink-mute);
+    }
+    .trace__row--bridge td {
+        color: var(--azure);
+        font-weight: 500;
+    }
+    .trace__ranking {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        list-style: none;
+        counter-reset: rank;
+        border: 1px solid var(--ink);
+        box-shadow: 3px 3px 0 var(--paper-line);
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        display: grid;
+        gap: 0.3em;
+    }
+    .trace__ranking li {
+        counter-increment: rank;
+        display: flex;
+        gap: 0.8em;
+        align-items: baseline;
+    }
+    .trace__ranking li::before {
+        content: counter(rank) '.';
+        color: var(--ink-mute);
+        width: 1.4em;
+    }
+    .trace__rank-id {
+        color: var(--azure);
+        font-weight: 500;
+    }
+    .trace__rank-note {
+        font-family: var(--font-hand);
+        font-size: 1.15em;
+        color: var(--azure);
+    }
+</style>

@@ -1,0 +1,185 @@
+---
+/* One movement of a query through the web. The plate alternates sides: odd
+   chapters plate-right, even chapters plate-left. Under the plate, the
+   chapter's line of the canonical trace, as a ledger card. */
+import type { Chapter } from '../data/chapters';
+import Halftone from './Halftone.astro';
+import { mark } from '../lib/mark';
+import { cite } from '../lib/cite';
+
+interface Props {
+    chapter: Chapter;
+}
+const { chapter } = Astro.props;
+const flip = chapter.n % 2 === 0;
+---
+
+<article
+    class:list={['chapter', { 'chapter--flip': flip }]}
+    id={`chapter-${chapter.slug}`}
+    aria-labelledby={`chapter-${chapter.slug}-title`}
+>
+    <div class="chapter__text">
+        <p class="chapter__n" aria-hidden="true">
+            <span>{String(chapter.n).padStart(2, '0')}</span>
+            <span class="chapter__verb">{chapter.verb}</span>
+        </p>
+        <h3 id={`chapter-${chapter.slug}-title`} class="chapter__title">
+            <span class="visually-hidden">{chapter.verb}: </span>
+            {chapter.question}
+        </h3>
+        <div class="chapter__vignette">
+            <Halftone
+                id={chapter.vignette}
+                tone="paper"
+                vignette
+                sizes="9rem"
+                class="chapter__vignette-img"
+            />
+            <p class="marginalia">{chapter.vignetteNote}</p>
+        </div>
+        {chapter.body.map((p) => (
+            <p set:html={mark(p)} />
+        ))}
+        <p class="chapter__tags">
+            <span class="chapter__tags-label">{chapter.tagsLabel}</span>
+            {chapter.tags.map((t) => (
+                <code>{t}</code>
+            ))}
+        </p>
+    </div>
+    <div class="chapter__side">
+        <figure class="chapter__plate">
+            <Halftone
+                id={chapter.plate}
+                tone="paper"
+                hover="azure"
+                drift
+                sizes="(min-width: 64rem) 38vw, 92vw"
+            />
+            <figcaption class="caption chapter__caption" set:html={cite(chapter.plateCaption)} />
+        </figure>
+        <dl class="ledger" aria-label={`The canonical trace, ${chapter.verb.toLowerCase()}`}>
+            {chapter.ledger.map((l) => (
+                <div class="ledger__row">
+                    <dt>{l.hop}</dt>
+                    <dd>
+                        <span>{l.text}</span>
+                        {l.note ? <span class="ledger__note">{l.note}</span> : null}
+                    </dd>
+                </div>
+            ))}
+        </dl>
+    </div>
+</article>
+
+<style>
+    .chapter {
+        display: grid;
+        gap: var(--space-6);
+        align-items: start;
+        padding-block: var(--space-7);
+        border-top: 1px dashed var(--paper-line);
+    }
+    @media (min-width: 64rem) {
+        .chapter {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: var(--space-8);
+        }
+        .chapter--flip .chapter__text {
+            order: 2;
+        }
+    }
+    .chapter__n {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-3);
+        font-family: var(--font-display);
+        font-size: var(--step-6);
+        line-height: 1;
+        color: var(--azure);
+        margin: 0 0 var(--space-2);
+        font-variation-settings:
+            'opsz' 144,
+            'WONK' 1;
+    }
+    .chapter__verb {
+        font-family: var(--font-type);
+        font-size: var(--step-0);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-mute);
+    }
+    .chapter__title {
+        font-size: var(--step-4);
+        max-width: 16ch;
+    }
+    .chapter__vignette {
+        display: grid;
+        grid-template-columns: 9rem 1fr;
+        gap: var(--space-4);
+        align-items: center;
+        margin-block: var(--space-4) var(--space-5);
+    }
+    .chapter__vignette :global(.chapter__vignette-img) {
+        width: 9rem;
+    }
+    .chapter__vignette .marginalia {
+        max-width: 28ch;
+        margin: 0;
+    }
+    .chapter__tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        align-items: baseline;
+        font-size: var(--step--1);
+        margin-top: var(--space-5);
+    }
+    .chapter__tags-label {
+        font-family: var(--font-type);
+        color: var(--ink-mute);
+        margin-right: var(--space-1);
+    }
+    .chapter__side {
+        display: grid;
+        gap: var(--space-5);
+    }
+    .chapter__plate {
+        margin: 0;
+    }
+    .chapter__caption {
+        margin-top: var(--space-3);
+    }
+    /* The ledger card: the trace's own line, set like a specimen label. */
+    .ledger {
+        margin: 0 var(--space-3);
+        padding: var(--space-3) var(--space-4);
+        border: 1px solid var(--ink);
+        box-shadow: 3px 3px 0 var(--ice-line);
+        background: var(--ice);
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        display: grid;
+        gap: var(--space-2);
+    }
+    .ledger__row {
+        display: grid;
+        grid-template-columns: 4.5em minmax(0, 1fr);
+        gap: var(--space-3);
+    }
+    .ledger dt {
+        color: var(--azure);
+        font-weight: 500;
+    }
+    .ledger dd {
+        margin: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.2em 1em;
+    }
+    .ledger__note {
+        color: var(--ink-mute);
+        font-style: italic;
+    }
+</style>

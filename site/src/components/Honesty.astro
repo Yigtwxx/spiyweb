@@ -1,0 +1,121 @@
+---
+/* The output contract as a wall of field cards: one per thing `retrieve()`
+   returns besides the passages, each with the accessor that returns it. The
+   seventh card sits beside a plate, so the grid closes evenly. */
+import { outputs } from '../data/honesty';
+import Halftone from './Halftone.astro';
+import SketchBox from './sketch/SketchBox.astro';
+import { mark } from '../lib/mark';
+---
+
+<div class="honesty">
+    <ul class="honesty__cards">
+        {outputs.map((o, i) => (
+            <li class="honesty__item">
+                <SketchBox padding="md" draw fill={i === 5} tone={i === 5 ? 'navy' : 'ink'}>
+                    <p class="honesty__n" aria-hidden="true">
+                        {String(i + 1).padStart(2, '0')}
+                    </p>
+                    <h3 class="honesty__title">{o.title}</h3>
+                    <p class="honesty__call">
+                        <code>{o.call}</code>
+                    </p>
+                    <p class="honesty__body" set:html={mark(o.body)} />
+                </SketchBox>
+            </li>
+        ))}
+        <li class="honesty__plate">
+            <figure>
+                <Halftone
+                    id="tempesta"
+                    tone="paper"
+                    hover="azure"
+                    drift
+                    sizes="(min-width: 64rem) 46vw, 92vw"
+                />
+                <figcaption class="caption honesty__caption">
+                    Antonio Tempesta, <cite>Minerva turns Arachne into a spider</cite>, 1606. The
+                    weaver who would not hide her work.
+                </figcaption>
+            </figure>
+        </li>
+    </ul>
+</div>
+
+<style>
+    .honesty__cards {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: var(--space-5);
+    }
+    @media (min-width: 40rem) {
+        .honesty__cards {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    @media (min-width: 64rem) {
+        .honesty__cards {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        /* Seven cards and a plate: the plate takes the last two cells. */
+        .honesty__plate {
+            grid-column: span 2;
+        }
+    }
+    .honesty__item :global(.sketch-box) {
+        height: 100%;
+    }
+    /* A card lifts under the pointer and catches a little frost light. */
+    .honesty__item {
+        transition:
+            transform 420ms var(--ease-silk),
+            filter 420ms var(--ease-silk);
+    }
+    @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+        .honesty__item:hover {
+            transform: translateY(-6px);
+            filter: drop-shadow(0 14px 22px color-mix(in srgb, var(--azure) 22%, transparent));
+        }
+    }
+    .honesty__n {
+        margin: 0 0 var(--space-2);
+        font-family: var(--font-display);
+        font-size: var(--step-3);
+        line-height: 1;
+        color: var(--azure);
+        font-variation-settings:
+            'opsz' 96,
+            'WONK' 1;
+    }
+    .honesty__title {
+        font-size: var(--step-2);
+        margin: 0 0 var(--space-2);
+    }
+    .honesty__call {
+        margin: 0 0 var(--space-3);
+        font-size: var(--step--1);
+    }
+    .honesty__call code {
+        background: var(--frost-wash);
+        color: var(--azure-deep);
+    }
+    .honesty__body {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: var(--step--1);
+    }
+    .honesty__plate figure {
+        margin: 0;
+    }
+    /* A wide window on the print, so the cell is no taller than the cards beside it. */
+    @media (min-width: 64rem) {
+        .honesty__plate :global(.halftone) {
+            aspect-ratio: 2.1 / 1;
+        }
+    }
+    .honesty__caption {
+        margin-top: var(--space-3);
+    }
+</style>

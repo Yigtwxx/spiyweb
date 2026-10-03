@@ -1,0 +1,217 @@
+---
+/* The ledger on the navy field: each figure set large, the set it was measured
+   on and the baselines it beat beside it; how the score is built in its own box,
+   so a reader can check the arithmetic before trusting the figures. */
+import { measures, method } from '../data/measured';
+import Halftone from './Halftone.astro';
+import SketchBox from './sketch/SketchBox.astro';
+import SketchRule from './sketch/SketchRule.astro';
+---
+
+<div class="measured">
+    <ol class="measured__list">
+        {measures.map((m) => (
+            <li class="measured__row">
+                <p class="measured__figure">
+                    <b>{m.figure}</b>
+                    <span class="measured__reading">{m.reading}</span>
+                </p>
+                <div class="measured__text">
+                    <p class="measured__what">{m.what}</p>
+                    <p class="measured__set">
+                        {m.set}
+                        {m.against ? <span class="measured__against">{m.against}</span> : null}
+                    </p>
+                </div>
+                <div class="measured__rule">
+                    <SketchRule tone="paper" />
+                </div>
+            </li>
+        ))}
+    </ol>
+    <div class="measured__side">
+        <figure class="measured__plate">
+            <span class="measured__glints" aria-hidden="true">
+                <i style="--x: 36%; --y: 10%; --d: 0.00s"></i>
+                <i style="--x: 40%; --y: 22%; --d: 0.55s"></i>
+                <i style="--x: 33%; --y: 30%; --d: 1.10s"></i>
+                <i style="--x: 48%; --y: 38%; --d: 1.65s"></i>
+                <i style="--x: 30%; --y: 48%; --d: 2.20s"></i>
+                <i style="--x: 55%; --y: 52%; --d: 2.75s"></i>
+                <i style="--x: 26%; --y: 62%; --d: 3.30s"></i>
+                <i style="--x: 62%; --y: 66%; --d: 3.85s"></i>
+                <i style="--x: 40%; --y: 72%; --d: 4.40s"></i>
+                <i style="--x: 70%; --y: 80%; --d: 4.95s"></i>
+                <i style="--x: 20%; --y: 86%; --d: 5.50s"></i>
+                <i style="--x: 52%; --y: 90%; --d: 6.05s"></i>
+            </span>
+            <Halftone id="dew" tone="navy" sizes="(min-width: 64rem) 26vw, 70vw" />
+            <figcaption class="caption">
+                <cite>Sector of a dew-laden orb web</cite>, Popular Science Monthly, 1890. Every
+                bead where it was measured.
+            </figcaption>
+        </figure>
+        <SketchBox tone="paper" padding="md" draw fill class="measured__method">
+            <p class="measured__reading">how it is scored</p>
+            <p class="measured__formula">{method.formula}</p>
+            <ul class="measured__lines">
+                {method.lines.map((l) => (
+                    <li>{l}</li>
+                ))}
+            </ul>
+            <p class="marginalia">Every number on this band is in RESULTS.md, with its interval.</p>
+        </SketchBox>
+    </div>
+</div>
+
+<style>
+    .measured {
+        view-timeline: --measured-plate block;
+        display: grid;
+        gap: var(--space-7);
+    }
+    @media (min-width: 64rem) {
+        .measured {
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+            gap: var(--space-8);
+            align-items: start;
+        }
+    }
+    .measured__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+    }
+    .measured__row {
+        position: relative;
+        display: grid;
+        gap: var(--space-2) var(--space-6);
+        padding-block: var(--space-5);
+    }
+    @media (min-width: 40rem) {
+        .measured__row {
+            grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+        }
+    }
+    .measured__figure {
+        display: grid;
+        margin: 0;
+    }
+    .measured__figure b {
+        font-family: var(--font-display);
+        font-weight: 400;
+        font-size: var(--step-5);
+        line-height: 1;
+        color: var(--paper);
+        font-variation-settings:
+            'opsz' 144,
+            'WONK' 1;
+    }
+    .measured__reading {
+        font-family: var(--font-type);
+        font-size: var(--step--1);
+        color: var(--frost-soft);
+        margin-top: var(--space-1);
+    }
+    .measured__what {
+        font-family: var(--font-display);
+        font-size: var(--step-2);
+        margin: 0 0 var(--space-2);
+    }
+    .measured__set {
+        margin: 0;
+        font-size: var(--step--1);
+    }
+    .measured__against {
+        display: block;
+        color: var(--frost-soft);
+        margin-top: 0.2em;
+    }
+    .measured__rule {
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+    }
+    .measured__plate {
+        position: relative;
+        margin: 0 0 var(--space-6);
+        max-width: 24rem;
+    }
+    /* Dew catching the light: a few beads on the web twinkle in turn. */
+    .measured__glints {
+        display: none;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        .measured__glints {
+            display: block;
+            position: absolute;
+            inset: 0 0 auto;
+            aspect-ratio: 0.712;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .measured__glints i {
+            position: absolute;
+            left: var(--x);
+            top: var(--y);
+            width: 14px;
+            height: 14px;
+            margin: -7px 0 0 -7px;
+            border-radius: 50%;
+            background: radial-gradient(
+                circle,
+                #fff 0 18%,
+                color-mix(in srgb, var(--frost) 60%, transparent) 30%,
+                transparent 70%
+            );
+            opacity: 0;
+            animation: glint 6.6s var(--d) ease-in-out infinite;
+        }
+        .measured__glints i::before,
+        .measured__glints i::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 26px;
+            height: 1px;
+            margin: -0.5px 0 0 -13px;
+            background: linear-gradient(90deg, transparent, #fff, transparent);
+        }
+        .measured__glints i::after {
+            transform: rotate(90deg);
+        }
+    }
+    @keyframes glint {
+        0%,
+        12%,
+        100% {
+            opacity: 0;
+            transform: scale(0.3) rotate(0deg);
+        }
+        6% {
+            opacity: 1;
+            transform: scale(1) rotate(45deg);
+        }
+    }
+    .measured__plate figcaption {
+        margin-top: var(--space-3);
+    }
+    .measured__formula {
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        color: var(--paper);
+        margin: var(--space-2) 0 var(--space-3);
+    }
+    .measured__lines {
+        margin: 0 0 var(--space-4);
+        padding-left: 1.1em;
+        font-size: var(--step--1);
+        display: grid;
+        gap: var(--space-2);
+    }
+    .measured__method .marginalia {
+        margin: 0;
+    }
+</style>

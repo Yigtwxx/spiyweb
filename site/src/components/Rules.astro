@@ -1,0 +1,171 @@
+---
+/* The six rules on paper. Two carry a small exhibit: the question the library
+   ships when sources disagree (questions.py, word for word), and the votes a
+   duplicate turns into. A title band of a web closes the list. */
+import { rules } from '../data/rules';
+import Halftone from './Halftone.astro';
+import SketchIcon from './sketch/SketchIcon.astro';
+import { mark } from '../lib/mark';
+---
+
+<div class="rules">
+    <ol class="rules__list">
+        {rules.map((rule, i) => (
+            <li class:list={['rule', `rule--${rule.id}`]}>
+                <div class="rule__top">
+                    <span class="rule__n" aria-hidden="true">
+                        {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <SketchIcon name={rule.icon} tone="navy" size={36} draw />
+                </div>
+                <h3 class="rule__title">{rule.title}</h3>
+                <p class="rule__body" set:html={mark(rule.body)} />
+                {rule.id === 'dispute' ? (
+                    <div class="rule__exhibit" aria-label="The question a caller receives">
+                        <p class="rule__file">build_conflict_question(answer.conflicts[0]).text</p>
+                        <div class="rule__code">
+                            <div>Two sources make opposing claims:</div>
+                            <div>&nbsp;&nbsp;(A) changelog: v2 shipped 12 March</div>
+                            <div>&nbsp;&nbsp;(B) minutes: release moved to 19 March</div>
+                            <div>Which should the answer rely on?</div>
+                            <div class="rule__options">
+                                1 Rely on (A) · 2 Rely on (B) ·{' '}
+                                <b>3 Keep both, marked as disputed</b>
+                            </div>
+                        </div>
+                        <p class="rule__hint">no answer back? option 3 is what happens</p>
+                    </div>
+                ) : null}
+                {rule.id === 'votes' ? (
+                    <div class="rule__exhibit" aria-label="Votes on a ranked passage">
+                        <p class="rule__file">answer.passages, three sources saying one thing</p>
+                        <div class="rule__code">
+                            <div>
+                                <span class="rule__k">5.62</span>&nbsp;&nbsp;
+                                <span class="rule__fence">3 votes</span>&nbsp;&nbsp;v2 rollout
+                                approved Tuesday
+                            </div>
+                            <div>
+                                <span class="rule__k">4.38</span>&nbsp;&nbsp;
+                                <span class="rule__k">1 vote</span>&nbsp;&nbsp;&nbsp;Tuesday review:
+                                decisions
+                            </div>
+                        </div>
+                        <p class="rule__hint">two copies cut, two votes kept, one slot used</p>
+                    </div>
+                ) : null}
+                <p class="marginalia rule__margin">{rule.margin}</p>
+            </li>
+        ))}
+    </ol>
+    <figure class="rules__plate">
+        <Halftone id="dijsselhof" tone="paper" sizes="(min-width: 64rem) 72rem, 92vw" />
+        <figcaption class="caption rules__caption">
+            Gerrit Willem Dijsselhof, <cite>Title head with a cross spider and web</cite>, 1893.
+            Every thread accounted for.
+        </figcaption>
+    </figure>
+</div>
+
+<style>
+    .rules {
+        display: grid;
+        gap: var(--space-7) var(--space-8);
+    }
+    @media (min-width: 56rem) {
+        .rules {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    /* The list's items and the plate share one grid: the list is flattened into
+       it, so seven rules and the plate fill two even columns. */
+    .rules__list {
+        display: contents;
+        list-style: none;
+    }
+    .rule {
+        display: grid;
+        align-content: start;
+        gap: var(--space-3);
+        padding-top: var(--space-4);
+        border-top: 2px solid var(--ink);
+    }
+    .rule__top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .rule__n {
+        font-family: var(--font-display);
+        font-size: var(--step-4);
+        line-height: 1;
+        color: var(--azure);
+        font-variation-settings:
+            'opsz' 96,
+            'WONK' 1;
+    }
+    .rule__title {
+        font-size: var(--step-2);
+        margin: 0;
+        max-width: 22ch;
+    }
+    .rule__body {
+        margin: 0;
+        color: var(--ink-soft);
+    }
+    /* The band closes the list across both columns. */
+    .rules__plate {
+        grid-column: 1 / -1;
+        margin: var(--space-4) 0 0;
+    }
+    .rules__caption {
+        margin-top: var(--space-3);
+    }
+    .rule__margin {
+        margin: 0;
+        max-width: 40ch;
+    }
+    .rule__exhibit {
+        background: color-mix(in srgb, var(--paper-deep) 80%, transparent);
+        border-left: 3px solid var(--azure);
+        padding: var(--space-3) var(--space-4);
+    }
+    .rule__code {
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        line-height: 1.9;
+        overflow-wrap: anywhere;
+    }
+    /* Inline pieces sit flush, as they would in the file. */
+    .rule__code > div {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+    }
+    .rule__file,
+    .rule__hint {
+        overflow-wrap: anywhere;
+        font-family: var(--font-type);
+        font-size: var(--step--1);
+        color: var(--ink-mute);
+        margin: 0 0 var(--space-2);
+    }
+    .rule__hint {
+        margin: var(--space-2) 0 0;
+    }
+    .rule__k {
+        color: var(--ink-mute);
+    }
+    .rule__fence {
+        color: var(--azure);
+        font-weight: 500;
+    }
+    .rule__options {
+        margin-top: var(--space-2);
+        color: var(--ink-soft);
+    }
+    .rule__options b {
+        color: var(--azure);
+        font-weight: 500;
+    }
+</style>

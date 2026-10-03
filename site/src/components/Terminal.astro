@@ -1,0 +1,304 @@
+---
+/* The scripted monitor: a dark panel in the TUI's own colours, on the paper page.
+   The full transcript is in the markup for screen readers and for no-JS. */
+import {
+    WORDMARK_BANDS,
+    WORDMARK_BLOCK,
+    WORDMARK_COLUMNS,
+    WORDMARK_SHADOW,
+    banner,
+    frames,
+    wordmark,
+} from '../data/demo';
+import { brailleSvg, cellStyle } from '../lib/braille';
+
+// Final state for the static transcript: last frame per id, in first-seen order.
+const finalLines = (() => {
+    const map = new Map<string, (typeof frames)[number]>();
+    frames.forEach((f, i) => {
+        map.set(f.id ?? `#${i}`, f);
+    });
+    return Array.from(map.values());
+})();
+
+// The mark as shapes: a cell is one unit wide and two tall, as in a terminal. Each
+// run of blocks in one gradient band is one rectangle (a hair taller than its row,
+// so rows do not show a seam); the shadow glyphs are double lines, stroked.
+const CELL_HEIGHT = 2;
+const SEAM = 0.04;
+const viewWidth = WORDMARK_COLUMNS;
+const viewHeight = wordmark.length * CELL_HEIGHT;
+const bandOf = (x: number): number =>
+    Math.min(WORDMARK_BANDS.length - 1, Math.floor((x * WORDMARK_BANDS.length) / WORDMARK_COLUMNS));
+const blocks: string[] = WORDMARK_BANDS.map(() => '');
+wordmark.forEach((line, row) => {
+    const cells = Array.from(line);
+    let x = 0;
+    while (x < cells.length) {
+        if (cells[x] !== WORDMARK_BLOCK) {
+            x += 1;
+            continue;
+        }
+        const band = bandOf(x);
+        let end = x;
+        while (end < cells.length && cells[end] === WORDMARK_BLOCK && bandOf(end) === band)
+            end += 1;
+        blocks[band] += `M${x} ${row * CELL_HEIGHT}h${end - x}v${CELL_HEIGHT + SEAM}h${x - end}z`;
+        x = end;
+    }
+});
+// Double lines sit this far either side of a cell's centre.
+const DX = 0.2;
+const DY = 0.26;
+const shadowCell = (glyph: string, x: number, y: number): string => {
+    const cx = x + 0.5;
+    const cy = y + CELL_HEIGHT / 2;
+    const r = x + 1;
+    const bottom = y + CELL_HEIGHT;
+    switch (glyph) {
+        case '═':
+            return `M${x} ${cy - DY}H${r}M${x} ${cy + DY}H${r}`;
+        case '║':
+            return `M${cx - DX} ${y}V${bottom}M${cx + DX} ${y}V${bottom}`;
+        case '╗':
+            return `M${x} ${cy - DY}H${cx + DX}V${bottom}M${x} ${cy + DY}H${cx - DX}V${bottom}`;
+        case '╔':
+            return `M${r} ${cy - DY}H${cx - DX}V${bottom}M${r} ${cy + DY}H${cx + DX}V${bottom}`;
+        case '╝':
+            return `M${x} ${cy + DY}H${cx + DX}V${y}M${x} ${cy - DY}H${cx - DX}V${y}`;
+        case '╚':
+            return `M${r} ${cy + DY}H${cx - DX}V${y}M${r} ${cy - DY}H${cx + DX}V${y}`;
+        default:
+            return '';
+    }
+};
+const shadow = wordmark
+    .flatMap((line, row) =>
+        Array.from(line).map((glyph, x) => shadowCell(glyph, x, row * CELL_HEIGHT)),
+    )
+    .join('');
+const tones = { shadow: WORDMARK_SHADOW, columns: WORDMARK_COLUMNS };
+---
+
+<div class="tui" data-tui>
+    <div class="tui__bar">
+        <span class="tui__dots" aria-hidden="true">
+            <i></i>
+            <i></i>
+            <i></i>
+        </span>
+        <span class="tui__title">spiyweb — live monitor</span>
+        <button class="tui__replay" type="button" data-tui-replay>
+            replay
+        </button>
+    </div>
+    <div class="tui__banner" aria-hidden="true">
+        <div class="tui__head">
+            <svg class="tui__mark" viewBox={`0 0 ${viewWidth} ${viewHeight}`} focusable="false">
+                {blocks.map((d, i) => (
+                    <path d={d} fill={WORDMARK_BANDS[i]} />
+                ))}
+                <path class="tui__mark-shadow" d={shadow} />
+            </svg>
+            <div class="tui__texts">
+                <div class="tui__banner-line">
+                    <span>{banner.version}</span>
+                    <span class="tui__right">{banner.context}</span>
+                </div>
+                <div class="tui__banner-line">
+                    <span>{banner.hint}</span>
+                    <span class="tui__right">{banner.commands}</span>
+                </div>
+            </div>
+        </div>
+        <div class="tui__rule"></div>
+    </div>
+    <div class="tui__screen">
+        <!-- The run's final state, invisible, in the same cell as the live output: the
+             panel is its full height from the first frame, so lines typed into it never
+             push the page below them (on a phone the page jumped 150 px while it played). -->
+        <div class="tui__out tui__ghost" aria-hidden="true">
+            {finalLines.map((f) => (
+                <div class="tui__line">
+                    {f.spans.map((s) =>
+                        s.braille ? (
+                            <span
+                                data-tone={s.tone}
+                                style={cellStyle(s)}
+                                set:html={brailleSvg(s.text)}
+                            />
+                        ) : (
+                            <span data-tone={s.tone} style={s.cells ? cellStyle(s) : undefined}>
+                                {s.text}
+                            </span>
+                        ),
+                    )}
+                </div>
+            ))}
+        </div>
+        <div class="tui__out" data-tui-out aria-hidden="true"></div>
+    </div>
+    <pre class="visually-hidden">{finalLines.map((f) => f.spans.map((s) => s.text).join('')).join('\n')}</pre>
+</div>
+
+<style define:vars={tones}>
+    .tui {
+        max-width: 100%;
+        min-width: 0;
+        background: var(--tui-bg);
+        color: var(--tui-fg);
+        font-family: var(--font-mono);
+        font-size: clamp(0.66rem, 0.55rem + 0.55vw, 0.9rem);
+        line-height: 1.5;
+        border-radius: 6px;
+        padding: 0 0 var(--space-4);
+        min-height: 34em;
+        overflow: hidden;
+        /* a rim of frost, as if the panel were cut from ice */
+        box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--frost) 45%, transparent),
+            0 0 0 6px color-mix(in srgb, var(--frost) 18%, transparent),
+            0 24px 60px -30px color-mix(in srgb, var(--navy) 70%, transparent);
+    }
+    .tui__bar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        padding: 0.6em 1em;
+        border-bottom: 1px solid color-mix(in srgb, var(--tui-fg) 12%, transparent);
+        color: color-mix(in srgb, var(--tui-fg) 60%, transparent);
+    }
+    .tui__dots i {
+        display: inline-block;
+        width: 0.7em;
+        height: 0.7em;
+        border-radius: 50%;
+        margin-right: 0.35em;
+        background: color-mix(in srgb, var(--tui-fg) 22%, transparent);
+    }
+    .tui__title {
+        flex: 1;
+    }
+    .tui__replay {
+        background: none;
+        border: 1px solid color-mix(in srgb, var(--tui-fg) 30%, transparent);
+        color: inherit;
+        border-radius: 3px;
+        padding: 0.1em 0.6em;
+        cursor: pointer;
+        font: inherit;
+    }
+    .tui__replay:hover {
+        color: var(--tui-fg);
+        border-color: var(--tui-fg);
+    }
+    /* The TUI's layout rule, by the panel's width in text cells: the two text lines
+       sit beside the mark when both fit to its right, under it otherwise. */
+    .tui__banner {
+        container-type: inline-size;
+        padding: 1em 1.2em 0;
+        white-space: pre;
+    }
+    .tui__head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.6em;
+    }
+    .tui__mark {
+        display: block;
+        width: min(100%, calc(var(--columns) * 1ch));
+        height: auto;
+    }
+    .tui__mark-shadow {
+        fill: none;
+        stroke: var(--shadow);
+        stroke-width: 0.2;
+        stroke-linejoin: miter;
+    }
+    .tui__texts {
+        min-width: 0;
+    }
+    @container (min-width: 100ch) {
+        .tui__head {
+            grid-template-columns: calc(var(--columns) * 1ch) minmax(0, 1fr);
+            column-gap: 2ch;
+            align-items: center;
+        }
+    }
+    .tui__banner-line {
+        display: flex;
+        min-width: 0;
+    }
+    /* When the panel is narrow the left text gives way, as a terminal would clip
+       it, and the right-aligned part keeps its place. */
+    .tui__banner-line > :first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .tui__right {
+        flex: none;
+        margin-left: auto;
+        padding-left: 1em;
+        text-align: right;
+    }
+    /* The full-width rule that closes the banner, in the shadow's tone. */
+    .tui__rule {
+        height: 1px;
+        margin-top: 0.75em;
+        background: var(--shadow);
+    }
+    .tui__screen {
+        display: grid;
+    }
+    .tui__screen > .tui__out {
+        grid-area: 1 / 1;
+        min-width: 0;
+    }
+    .tui__ghost {
+        visibility: hidden;
+        pointer-events: none;
+    }
+    .tui__out {
+        padding: 0.6em 1.2em 0;
+        white-space: pre;
+        overflow-x: auto;
+    }
+    .tui__out :global([data-tone='ok']) {
+        color: var(--tui-ok);
+    }
+    .tui__out :global([data-tone='warn']) {
+        color: var(--tui-warn);
+    }
+    .tui__out :global([data-tone='bad']) {
+        color: var(--tui-bad);
+    }
+    .tui__out :global([data-tone='dim']) {
+        color: var(--tui-dim);
+    }
+    .tui__out :global([data-tone='accent']) {
+        color: var(--tui-accent);
+    }
+    .tui__out :global([data-tone='blue']) {
+        color: var(--tui-blue);
+    }
+    /* The hop ramp, as the monitor paints it: bright at the seed, deeper with
+       every hop the energy travels. */
+    .tui__out :global([data-tone='hop0']) {
+        color: #8be3f2;
+    }
+    .tui__out :global([data-tone='hop1']) {
+        color: #62c6ee;
+    }
+    .tui__out :global([data-tone='hop2']) {
+        color: #4ea6e8;
+    }
+    .tui__out :global([data-tone='hop3']) {
+        color: #3f8ce0;
+    }
+</style>
+
+<script>
+    import { initTerminals } from '../scripts/terminal';
+    initTerminals();
+</script>

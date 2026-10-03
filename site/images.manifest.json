@@ -1,0 +1,305 @@
+{
+    "$comment": "Public-domain sources for the site's halftones. Every entry was checked on its Commons page for licence before being added (Rijksmuseum entries: CC0, 'Publiek domein'; makers all died before 1925). Run `npm run images` after editing; the outputs in public/images are committed.",
+    "images": [
+        {
+            "id": "suspended",
+            "alt": "A garden spider letting itself down from a leafy twig on a single thread. Wood engraving.",
+            "title": "Epeira diadema suspended by its thread (Popular Science Monthly, vol. 50)",
+            "author": "Unknown engraver",
+            "year": 1896,
+            "licence": "Public domain",
+            "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
+            "page_url": "https://commons.wikimedia.org/wiki/File:PSM_V50_D391_Epeira_diadema_suspended_by_its_thread.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/7/7c/PSM_V50_D391_Epeira_diadema_suspended_by_its_thread.jpg",
+            "contrast": 1.5,
+            "tones": [
+                "paper",
+                "azure"
+            ]
+        },
+        {
+            "id": "dew",
+            "alt": "A sector of an orb web strung with dew, every thread a line of bright beads against black. Engraving.",
+            "title": "Sector of a dew-laden orb web (Popular Science Monthly, vol. 37)",
+            "author": "Unknown engraver",
+            "year": 1890,
+            "licence": "Public domain",
+            "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
+            "page_url": "https://commons.wikimedia.org/wiki/File:PSM_V37_D052_Sector_of_a_dew_laden_orb_web.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/2/27/PSM_V37_D052_Sector_of_a_dew_laden_orb_web.jpg",
+            "crop": {
+                "x": 0.0,
+                "y": 0.0,
+                "w": 1.0,
+                "h": 1.0
+            },
+            "tones": [
+                "navy"
+            ]
+        },
+        {
+            "id": "argiope",
+            "alt": "A banded garden spider resting head-down at the centre of its web, legs paired along the zigzag silk. Line engraving.",
+            "title": "Argiope at the hub of its web (American Spiders and Their Spinningwork)",
+            "author": "Henry C. McCook",
+            "year": 1890,
+            "licence": "Public domain",
+            "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
+            "page_url": "https://commons.wikimedia.org/wiki/File:American_spiders_and_their_spinningwork._A_natural_history_of_the_orbweaving_spiders_of_the_United_States,_with_special_regard_to_their_industry_and_habits_(1890)_(14591579638).jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/c/c1/American_spiders_and_their_spinningwork._A_natural_history_of_the_orbweaving_spiders_of_the_United_States%2C_with_special_regard_to_their_industry_and_habits_%281890%29_%2814591579638%29.jpg",
+            "source": "Internet Archive Book Images",
+            "crop": {
+                "x": 0.16,
+                "y": 0.1,
+                "w": 0.66,
+                "h": 0.78
+            },
+            "tones": [
+                "paper"
+            ]
+        },
+        {
+            "id": "hokusai",
+            "alt": "Mount Fuji seen through a spider web strung across the foreground, a spider waiting below. Woodblock print.",
+            "title": "Fuji behind a spider web (One Hundred Views of Mount Fuji)",
+            "author": "Katsushika Hokusai",
+            "year": 1835,
+            "licence": "Public domain",
+            "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Hokusai_Mt_Fuji_Behind_a_Spider_Net.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/c/cb/Hokusai_Mt_Fuji_Behind_a_Spider_Net.jpg",
+            "crop": {
+                "x": 0.07,
+                "y": 0.09,
+                "w": 0.86,
+                "h": 0.89
+            },
+            "contrast": 1.5,
+            "tones": [
+                "paper",
+                "azure"
+            ]
+        },
+        {
+            "id": "geometric",
+            "alt": "A perfect orb web drawn as geometry, its spider waiting at the edge. Wood engraving.",
+            "title": "The geometric net of Epeira diadema (The Penny Magazine)",
+            "author": "Unknown engraver",
+            "year": 1834,
+            "licence": "Public domain",
+            "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Penny_Magazine_1834_131_Geometric_Net_of_Epeira_diadema.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/9/95/Penny_Magazine_1834_131_Geometric_Net_of_Epeira_diadema.jpg",
+            "crop": {
+                "x": 0.03,
+                "y": 0.03,
+                "w": 0.94,
+                "h": 0.94
+            },
+            "tones": [
+                "paper",
+                "azure"
+            ],
+            "contrast": 1.7
+        },
+        {
+            "id": "garden-web",
+            "alt": "An orb web framed by twigs and leaves, the spiral fine as hair. Wood engraving.",
+            "title": "Web of the garden spider (Popular Science Monthly, vol. 33)",
+            "author": "Unknown engraver",
+            "year": 1888,
+            "licence": "Public domain",
+            "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
+            "page_url": "https://commons.wikimedia.org/wiki/File:PSM_V33_D817_Web_of_the_garden_spider.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/2/23/PSM_V33_D817_Web_of_the_garden_spider.jpg",
+            "tones": [
+                "paper"
+            ]
+        },
+        {
+            "id": "snare",
+            "alt": "A round web with its spider at the hub and a fly caught near the rim. Wood engraving.",
+            "title": "Snare of the long-bodied garden spider (Popular Science Monthly, vol. 50)",
+            "author": "Unknown engraver",
+            "year": 1896,
+            "licence": "Public domain",
+            "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
+            "page_url": "https://commons.wikimedia.org/wiki/File:PSM_V50_D392_Snare_of_long_bodied_garden_spider_tretnagnatha_extensa.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/5f/PSM_V50_D392_Snare_of_long_bodied_garden_spider_tretnagnatha_extensa.jpg",
+            "tones": [
+                "paper"
+            ]
+        },
+        {
+            "id": "foxglove",
+            "alt": "A spider web stretched between a pine bough and a foxglove, bending in the wind. Wood engraving.",
+            "title": "Pine, foxglove, spiderweb, wind",
+            "author": "Unknown engraver",
+            "year": 1873,
+            "licence": "Public domain",
+            "licence_url": "https://commons.wikimedia.org/wiki/Template:PD-old",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Pine,_Foxglove,_Spiderweb,_Wind.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/fb/Pine%2C_Foxglove%2C_Spiderweb%2C_Wind.jpg",
+            "tones": [
+                "paper",
+                "azure"
+            ]
+        },
+        {
+            "id": "mankes",
+            "alt": "A garden spider at the centre of its orb web, every radial thread and spiral lit white against black. Wood engraving.",
+            "title": "Kruisspin in zijn web (Garden spider in its web)",
+            "author": "Jan Mankes",
+            "year": 1916,
+            "licence": "CC0 1.0",
+            "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Kruisspin_in_zijn_web,_RP-P-1921-1932.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/6/69/Kruisspin_in_zijn_web%2C_RP-P-1921-1932.jpg",
+            "source": "Rijksmuseum, Amsterdam",
+            "crop": {
+                "x": 0.29,
+                "y": 0.268,
+                "w": 0.42,
+                "h": 0.405
+            },
+            "gamma": 1.0,
+            "tones": [
+                "navy"
+            ],
+            "contrast": 1.7
+        },
+        {
+            "id": "graag",
+            "alt": "A cross spider seen from above, sitting in the middle of its web; the threads cut white out of black. Woodcut.",
+            "title": "Spin in een web (Spider in a web)",
+            "author": "Julie de Graag",
+            "year": 1918,
+            "licence": "CC0 1.0",
+            "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Spin_in_een_web,_RP-P-1935-907.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/2/2a/Spin_in_een_web%2C_RP-P-1935-907.jpg",
+            "source": "Rijksmuseum, Amsterdam",
+            "crop": {
+                "x": 0.215,
+                "y": 0.19,
+                "w": 0.555,
+                "h": 0.6
+            },
+            "tones": [
+                "paper",
+                "azure"
+            ]
+        },
+        {
+            "id": "tempesta",
+            "alt": "Minerva, helmeted, points at Arachne beside her loom as the weaver is turned into a spider. Etching.",
+            "title": "Minerva verandert Arachne in een spin (Minerva turns Arachne into a spider)",
+            "author": "Antonio Tempesta",
+            "year": 1606,
+            "licence": "CC0 1.0",
+            "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Minerva_verandert_Arachne_in_een_spin,_RP-P-OB-37.828.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/1/19/Minerva_verandert_Arachne_in_een_spin%2C_RP-P-OB-37.828.jpg",
+            "source": "Rijksmuseum, Amsterdam",
+            "crop": {
+                "x": 0.02,
+                "y": 0.03,
+                "w": 0.96,
+                "h": 0.83
+            },
+            "tones": [
+                "paper",
+                "azure"
+            ]
+        },
+        {
+            "id": "luyken",
+            "alt": "Two men in a landscape stop to study a spider web strung between the branches of a tree. Etching.",
+            "title": "Embleem spin: twee mannen bekijken een spinnenweb (Two men study a spider web)",
+            "author": "Jan Luyken",
+            "year": 1700,
+            "licence": "CC0 1.0",
+            "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Embleem_spin_Twee_mannen_bekijken_een_spinnenweb,_RP-P-OB-44.857.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/2/20/Embleem_spin_Twee_mannen_bekijken_een_spinnenweb%2C_RP-P-OB-44.857.jpg",
+            "source": "Rijksmuseum, Amsterdam",
+            "crop": {
+                "x": 0.02,
+                "y": 0.02,
+                "w": 0.96,
+                "h": 0.96
+            },
+            "tones": [
+                "paper",
+                "azure"
+            ]
+        },
+        {
+            "id": "weiditz",
+            "alt": "An armoured Minerva beside a huge spider web hung between trees, its spider at the centre. Woodcut.",
+            "title": "Minerva als strijder bij een spinnenweb met spin (Minerva beside a spider web)",
+            "author": "Hans Weiditz (II)",
+            "year": 1532,
+            "licence": "CC0 1.0",
+            "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Minerva_als_strijder_bij_een_spinnenweb_met_spin,_RP-P-1874-11-6-1.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Minerva_als_strijder_bij_een_spinnenweb_met_spin%2C_RP-P-1874-11-6-1.jpg",
+            "source": "Rijksmuseum, Amsterdam",
+            "crop": {
+                "x": 0.0,
+                "y": 0.0,
+                "w": 1.0,
+                "h": 1.0
+            },
+            "tones": [
+                "paper",
+                "azure"
+            ]
+        },
+        {
+            "id": "vault",
+            "alt": "A vaulted ceiling seen from below, a vast spider web spanning it from rib to rib. Woodcut.",
+            "title": "Gewelf met spinnenweb (Vault with a spider web)",
+            "author": "Hans Weiditz (II)",
+            "year": 1532,
+            "licence": "CC0 1.0",
+            "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Gewelf_met_spinnenweb,_RP-P-1874-11-72-1.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/0/03/Gewelf_met_spinnenweb%2C_RP-P-1874-11-72-1.jpg",
+            "source": "Rijksmuseum, Amsterdam",
+            "crop": {
+                "x": 0.0,
+                "y": 0.0,
+                "w": 1.0,
+                "h": 0.85
+            },
+            "tones": [
+                "paper",
+                "azure"
+            ]
+        },
+        {
+            "id": "dijsselhof",
+            "alt": "A decorative title band: a cross spider at the hub of a half-wheel web, threads radiating across a dark field. Woodcut.",
+            "title": "Titelhoofd met kruisspin en spinnenweb (Title head with a cross spider and web)",
+            "author": "Gerrit Willem Dijsselhof",
+            "year": 1893,
+            "licence": "CC0 1.0",
+            "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "page_url": "https://commons.wikimedia.org/wiki/File:Titelhoofd_met_kruisspin_en_spinnenweb,_RP-P-1944-2688.jpg",
+            "source_url": "https://upload.wikimedia.org/wikipedia/commons/d/d0/Titelhoofd_met_kruisspin_en_spinnenweb%2C_RP-P-1944-2688.jpg",
+            "source": "Rijksmuseum, Amsterdam",
+            "tones": [
+                "paper",
+                "navy"
+            ],
+            "crop": {
+                "x": 0.075,
+                "y": 0.13,
+                "w": 0.85,
+                "h": 0.765
+            },
+            "contrast": 1.6
+        }
+    ]
+}

@@ -1,0 +1,211 @@
+---
+/* The navy field. One web, one sentence, one command. Behind it all, a live orb
+   web continues the engraved one (scripts/web-canvas.ts): click the field to drop
+   a query into it. */
+import Halftone from './Halftone.astro';
+import InstallBox from './InstallBox.astro';
+import SketchUnderline from './sketch/SketchUnderline.astro';
+import { version } from '../data/commands';
+---
+
+<section class="hero" id="top" aria-labelledby="hero-title" data-web-field>
+    <canvas class="hero__web" data-web-canvas aria-hidden="true"></canvas>
+    <div class="page hero__grid">
+        <div class="hero__copy">
+            <p class="hero__kicker">
+                spiyweb <span class="hero__version">v{version}</span>
+                <span class="hero__tag">spreading-activation retrieval for RAG</span>
+            </p>
+            <h1 id="hero-title" class="hero__title">
+                Not top-k.
+                <br />
+                The whole{' '}
+                <SketchUnderline tone="frost" draw>
+                    web.
+                </SketchUnderline>
+            </h1>
+            <p class="hero__lede">
+                spiyweb drops your query into a graph of passages as an{' '}
+                <em class="key">energy seed</em> and lets it spread. Close evidence lights up first;
+                evidence that is <em class="key">only connected through other passages</em> lights
+                up a hop later. When the energy runs out, the web stops itself. No <code>k</code>{' '}
+                anywhere.
+            </p>
+            <InstallBox tone="paper" id="hero-install" />
+            <p class="hero__fine">
+                Python 3.11+ on Windows, macOS and Linux. <code>pip install spiyweb</code> pulls in
+                nothing: the core is pure Python. Then type <code>spiyweb</code> and watch your
+                app's queries spread.
+            </p>
+        </div>
+        <figure class="hero__figure">
+            <div class="hero__plate" data-web-hub>
+                <Halftone
+                    id="mankes"
+                    tone="navy"
+                    loading="eager"
+                    fetchpriority="high"
+                    drift="page"
+                    vignette
+                    sizes="(min-width: 64rem) 40vw, 92vw"
+                />
+            </div>
+            <figcaption class="caption hero__caption">
+                Jan Mankes, <cite>Kruisspin in zijn web</cite>, 1916. The web around it is live:
+                click the field to drop a query in.
+            </figcaption>
+            <button class="hero__toggle" type="button" data-web-toggle aria-pressed="false">
+                pause the web
+            </button>
+        </figure>
+    </div>
+</section>
+
+<script>
+    import { initWebCanvas } from '../scripts/web-canvas';
+    initWebCanvas();
+</script>
+
+<style>
+    .hero {
+        --field: var(--navy);
+        --pen: var(--frost-soft);
+        --caption: var(--frost-soft);
+        --key-mark: color-mix(in srgb, var(--frost) 16%, transparent);
+        background: var(--navy);
+        color: var(--paper);
+        padding-block: var(--space-7) var(--space-8);
+        overflow: clip;
+        position: relative;
+        isolation: isolate;
+    }
+    /* The live web: under everything, the full size of the field. */
+    .hero__web {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+    }
+    .hero__toggle {
+        margin-top: var(--space-3);
+        background: none;
+        border: 1px dashed color-mix(in srgb, var(--frost-soft) 60%, transparent);
+        color: var(--frost-soft);
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        padding: 0.2em 0.7em;
+        border-radius: 2px;
+        cursor: pointer;
+    }
+    .hero__toggle:hover {
+        border-style: solid;
+    }
+    .hero__toggle[hidden] {
+        display: none;
+    }
+    .hero__lede code,
+    .hero__fine code {
+        background: color-mix(in srgb, var(--navy-deep) 70%, transparent);
+        color: var(--frost-soft);
+    }
+    .hero__grid {
+        display: grid;
+        gap: var(--space-6);
+        align-items: center;
+    }
+    @media (min-width: 64rem) {
+        .hero__grid {
+            grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+            gap: var(--space-7);
+            min-height: calc(100vh - 3.5rem);
+        }
+    }
+    .hero__kicker {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.4em 1.2em;
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        color: var(--frost-soft);
+        margin-bottom: var(--space-5);
+    }
+    .hero__tag {
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0.1em 0.5em;
+        border: 1px dashed currentColor;
+    }
+    .hero__title {
+        color: var(--paper);
+        margin-bottom: var(--space-5);
+        max-width: 13ch;
+    }
+    .hero__lede {
+        font-size: var(--step-1);
+        line-height: 1.45;
+        max-width: 38ch;
+        margin-bottom: var(--space-6);
+    }
+    .hero__fine {
+        font-size: var(--step--1);
+        color: var(--frost-soft);
+        margin-top: var(--space-4);
+        max-width: 50ch;
+    }
+    .hero__figure {
+        margin: 0;
+    }
+    /* The opening: the copy rises out of the night line by line while the plate
+       develops from the spider outward (its --rx/--ry pin the reveal to the hub). */
+    @media (prefers-reduced-motion: no-preference) {
+        :global(.js) .hero__copy > *,
+        :global(.js) .hero__caption,
+        :global(.js) .hero__toggle {
+            animation: hero-rise 1100ms var(--ease-silk) both;
+        }
+        :global(.js) .hero__kicker {
+            animation-delay: 150ms;
+        }
+        :global(.js) .hero__title {
+            animation-delay: 300ms;
+        }
+        :global(.js) .hero__lede {
+            animation-delay: 520ms;
+        }
+        :global(.js) .hero__copy > :global(.install) {
+            animation-delay: 700ms;
+        }
+        :global(.js) .hero__fine {
+            animation-delay: 860ms;
+        }
+        :global(.js) .hero__caption,
+        :global(.js) .hero__toggle {
+            animation-delay: 1500ms;
+        }
+    }
+    @keyframes hero-rise {
+        from {
+            opacity: 0;
+            transform: translateY(28px);
+            filter: blur(10px);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+            filter: none;
+        }
+    }
+    .hero__plate {
+        --rx: 50%;
+        --ry: 36%;
+        position: relative;
+        max-width: 34rem;
+        margin-inline: auto;
+    }
+    .hero__caption {
+        margin-top: var(--space-3);
+        max-width: 44ch;
+    }
+</style>

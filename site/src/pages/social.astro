@@ -1,0 +1,134 @@
+---
+/* The social card, rendered as a page and captured into public/social-preview.jpg
+   (the site's link preview) and .github/social-preview.jpg (GitHub's), see
+   scripts/og.md. 1280x640, GitHub's recommended size. Not linked, not indexed,
+   not in the sitemap. */
+import '../styles/global.css';
+import PencilDefs from '../components/sketch/PencilDefs.astro';
+import Halftone from '../components/Halftone.astro';
+import SketchUnderline from '../components/sketch/SketchUnderline.astro';
+import Logo from '../components/Logo.astro';
+---
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="robots" content="noindex, nofollow" />
+        <title>social</title>
+    </head>
+    <body>
+        <PencilDefs />
+        <div class="card">
+            <div class="plate">
+                <Halftone id="mankes" tone="navy" loading="eager" vignette sizes="760px" />
+            </div>
+            <div class="wash"></div>
+            <div class="copy">
+                <p class="kicker">
+                    <Logo size="56px" framed /> spiyweb
+                </p>
+                <h1 class="title">
+                    Not top-k.
+                    <br />
+                    The whole <SketchUnderline tone="frost">web.</SketchUnderline>
+                </h1>
+                <p class="marginalia note">Retrieval that spreads like energy, and stops itself.</p>
+                <p class="foot">graph retrieval for RAG · pip install spiyweb</p>
+            </div>
+        </div>
+    </body>
+</html>
+
+<style is:global>
+    html,
+    body {
+        margin: 0;
+        width: 1280px;
+        height: 640px;
+        overflow: hidden;
+    }
+    body::before,
+    body::after {
+        display: none;
+    }
+    /* Mankes's orb web holds the right of the card; the words sit on the navy
+       field, which the web's own dark ground runs into. */
+    .card {
+        position: relative;
+        width: 1280px;
+        height: 640px;
+        overflow: hidden;
+        background: var(--navy);
+        color: var(--paper);
+        --pen: var(--frost-soft);
+    }
+    .plate {
+        position: absolute;
+        top: 0;
+        right: -20px;
+        bottom: 0;
+        width: 700px;
+    }
+    .plate .halftone {
+        aspect-ratio: auto;
+        height: 100%;
+    }
+    .plate .halftone__img {
+        object-position: center 30%;
+    }
+    .wash {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+            to right,
+            var(--navy) 0%,
+            var(--navy) 46%,
+            color-mix(in srgb, var(--navy) 60%, transparent) 58%,
+            transparent 72%
+        );
+    }
+    .copy {
+        position: relative;
+        box-sizing: border-box;
+        height: 100%;
+        max-width: 820px;
+        padding: 64px 72px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .kicker {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-family: var(--font-mono);
+        font-size: 24px;
+        color: var(--frost);
+        margin: 0 0 20px;
+    }
+    .title {
+        font-size: 88px;
+        font-weight: 360;
+        line-height: 0.98;
+        letter-spacing: -0.02em;
+        color: var(--paper);
+        margin: 0 0 32px;
+        font-variation-settings:
+            'opsz' 144,
+            'SOFT' 60,
+            'WONK' 1;
+    }
+    .note {
+        font-size: 32px;
+        line-height: 1.2;
+        max-width: 20ch;
+        margin: 0 0 28px;
+    }
+    .foot {
+        font-family: var(--font-mono);
+        font-size: 20px;
+        color: var(--frost-soft);
+        margin: 0;
+    }
+</style>

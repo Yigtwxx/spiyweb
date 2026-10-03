@@ -1,0 +1,96 @@
+/* Design tokens for the spiyweb site.
+   The page is a naturalist's plate at night: ice-blue paper, blue-black ink, and
+   the deep navy of the hour a web is spun. Navy is the field; frost is the silk
+   that lights up on it, never text on paper; azure carries emphasis on paper;
+   slate is reserved for what was cut or could not be checked. */
+:root {
+    /* paper and ink: a cold sheet, blue-black ink */
+    --paper: #e8f2f9;
+    --paper-deep: #d9e9f4;
+    --paper-line: #bcd6e8;
+    --ink: #0c1a2c; /* 15.4:1 on --paper, 13.7:1 on --ice */
+    --ink-soft: #2c3f57; /* 9.5:1 on --paper */
+    --ink-mute: #4a5d73; /* 5.96:1 on --paper, 5.28:1 on --ice */
+
+    /* the ice: a second, colder ground for the sections between the night bands */
+    --ice: #cfe7f4;
+    --ice-line: #a3c9e0;
+
+    /* the tint washed through the paper: frost from above, navy from below.
+       Faint enough that azure text stays above 4.5:1 anywhere on the page. */
+    --glow-frost: rgb(159 214 236 / 0.38);
+    --glow-navy: rgb(19 41 75 / 0.07);
+
+    /* the night: the field the web is spun across */
+    --navy: #13294b; /* 13.1:1 on --paper; the field, and the halftone ink on paper */
+    --navy-deep: #0a1a33;
+    --azure: #1a5d94; /* accent text: 6.1:1 on --paper, 5.4:1 on --ice */
+    --azure-deep: #123f66;
+
+    /* the silk: frost light on the field */
+    --frost: #9fd6ec; /* 9.2:1 on --navy; strokes and text on the field, never text on paper */
+    --frost-soft: #d6eef8; /* 12.1:1 on --navy */
+    --frost-wash: #e3f2f9;
+    --steel: #4c6c8c; /* 4.94:1 on --paper */
+
+    /* rejected, unverified */
+    --slate: #56606e; /* 5.75:1 on --paper */
+    --slate-soft: #b7c1ce;
+
+    /* verdict inks */
+    --ok: #2f6b4a; /* 5.7:1 on --paper */
+
+    /* terminal demo: the monitor's own palette, frost for what is lit */
+    --tui-bg: #0a1524;
+    --tui-fg: #dbe7f1; /* 14.6:1 on --tui-bg */
+    --tui-ok: #9ee6c4;
+    --tui-warn: #f2d48a;
+    --tui-bad: #ff8f8f;
+    --tui-dim: #7f93a8; /* 5.8:1 on --tui-bg */
+    --tui-accent: var(--frost);
+    --tui-blue: #7fb2f0;
+
+    /* type */
+    --font-display: 'Fraunces Variable', 'Fraunces Fallback', 'Iowan Old Style', Georgia, serif;
+    --font-body: 'Inter Variable', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --font-type: var(--font-mono); /* labels and captions: the specimen tag */
+    --font-hand:
+        'Patrick Hand', 'Bradley Hand', 'Segoe Print', cursive; /* field notes in the margin */
+
+    /* fluid type scale: ratio 1.2 at 360px → 1.25 at 1280px */
+    --step--1: clamp(0.83rem, 0.8rem + 0.15vw, 0.92rem);
+    --step-0: clamp(1rem, 0.95rem + 0.25vw, 1.15rem);
+    --step-1: clamp(1.2rem, 1.1rem + 0.5vw, 1.44rem);
+    --step-2: clamp(1.44rem, 1.25rem + 0.9vw, 1.8rem);
+    --step-3: clamp(1.73rem, 1.4rem + 1.6vw, 2.25rem);
+    --step-4: clamp(2.07rem, 1.5rem + 2.7vw, 2.81rem);
+    --step-5: clamp(2.49rem, 1.6rem + 4.4vw, 3.52rem);
+    --step-6: clamp(2.99rem, 1.6rem + 6.8vw, 4.4rem);
+
+    /* fluid spacing */
+    --space-1: clamp(0.25rem, 0.23rem + 0.1vw, 0.31rem);
+    --space-2: clamp(0.5rem, 0.46rem + 0.2vw, 0.63rem);
+    --space-3: clamp(0.75rem, 0.69rem + 0.3vw, 0.94rem);
+    --space-4: clamp(1rem, 0.92rem + 0.4vw, 1.25rem);
+    --space-5: clamp(1.5rem, 1.38rem + 0.6vw, 1.88rem);
+    --space-6: clamp(2rem, 1.84rem + 0.8vw, 2.5rem);
+    --space-7: clamp(3rem, 2.76rem + 1.2vw, 3.75rem);
+    --space-8: clamp(4rem, 3.68rem + 1.6vw, 5rem);
+    --space-9: clamp(6rem, 5.5rem + 2.4vw, 7.5rem);
+
+    /* the pencil */
+    --stroke: 1.5px;
+    --stroke-bold: 2.5px;
+
+    /* layout: a plate with a field-notes column on wide screens */
+    --page-max: 72rem;
+    --gutter: clamp(1rem, 4vw, 2.5rem);
+    --margin-col: clamp(0px, 18vw, 16rem);
+    --measure: 62ch;
+
+    /* motion */
+    --draw-duration: 900ms;
+    --ease-pen: cubic-bezier(0.3, 0, 0.2, 1);
+    --ease-silk: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out-quint: settles, does not bounce */
+}

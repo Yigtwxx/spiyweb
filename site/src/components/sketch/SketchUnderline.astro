@@ -1,0 +1,63 @@
+---
+/* Inline text with a pencil underline drawn beneath it — the way a reader
+   underlines the sentence that matters. */
+import type { Tone } from './SketchBox.astro';
+interface Props {
+    tone?: Tone;
+    draw?: boolean;
+}
+const { tone = 'navy', draw = false } = Astro.props;
+---
+
+<span class:list={['sketch-underline', `tone-${tone}`]}>
+    <slot />
+    <svg
+        class="sketch-underline__line"
+        viewBox="0 0 200 8"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        focusable="false"
+        data-draw={draw ? '' : undefined}
+    >
+        <path d="M2 5 C 40 2.5, 80 6.5, 120 4 S 180 3, 198 5.5"></path>
+    </svg>
+</span>
+
+<style>
+    .sketch-underline {
+        position: relative;
+        display: inline;
+        white-space: nowrap;
+        --ul-stroke: var(--azure);
+    }
+    .tone-ink {
+        --ul-stroke: var(--ink);
+    }
+    .tone-slate {
+        --ul-stroke: var(--slate);
+    }
+    .tone-frost {
+        --ul-stroke: var(--frost);
+    }
+    .tone-paper {
+        --ul-stroke: var(--paper);
+    }
+    .sketch-underline__line {
+        position: absolute;
+        left: -0.05em;
+        right: -0.05em;
+        bottom: -0.12em;
+        width: calc(100% + 0.1em);
+        height: 0.28em;
+        overflow: visible;
+        filter: url(#pencil-soft);
+        pointer-events: none;
+    }
+    path {
+        fill: none;
+        stroke: var(--ul-stroke);
+        stroke-width: var(--stroke-bold);
+        stroke-linecap: round;
+        vector-effect: non-scaling-stroke;
+    }
+</style>

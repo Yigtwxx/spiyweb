@@ -1,0 +1,123 @@
+---
+/* A box whose border is a pencil line: an SVG rectangle behind the content,
+   displaced by the shared `pencil` filter, drawn twice with a slight offset so it
+   reads as a hand going over the line. `draw` animates the stroke on scroll. */
+export type Tone = 'ink' | 'navy' | 'slate' | 'paper' | 'frost';
+interface Props {
+    as?: 'div' | 'section' | 'article' | 'aside' | 'li' | 'figure';
+    padding?: 'none' | 'sm' | 'md' | 'lg';
+    tone?: Tone;
+    draw?: boolean;
+    fill?: boolean;
+    class?: string;
+    id?: string;
+}
+const {
+    as: Tag = 'div',
+    padding = 'md',
+    tone = 'ink',
+    draw = false,
+    fill = false,
+    class: className,
+    ...rest
+} = Astro.props;
+// A frame is drawn slower than a small stroke: a box-sized line at the shared pace
+// read as a flash rather than a hand going round the box.
+const DRAW_MS = 1400;
+---
+
+<Tag
+    class:list={['sketch-box', `pad-${padding}`, `tone-${tone}`, { 'has-fill': fill }, className]}
+    {...rest}
+>
+    <svg
+        class="sketch-box__frame"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        focusable="false"
+        data-draw={draw ? '' : undefined}
+        data-draw-ms={draw ? DRAW_MS : undefined}
+        style={draw ? `--draw-duration: ${DRAW_MS}ms` : undefined}
+    >
+        <rect class="sketch-box__fill" x="1" y="1" width="98" height="98"></rect>
+        <path class="sketch-box__line" d="M2 2.5 L98 1.8 L98.4 98 L1.6 98.4 Z"></path>
+        <path
+            class="sketch-box__line sketch-box__line--echo"
+            d="M1.4 3 L97.6 2.6 L97.8 97.3 L2.4 97.8 Z"
+        ></path>
+    </svg>
+    <div class="sketch-box__body">
+        <slot />
+    </div>
+</Tag>
+
+<style>
+    .sketch-box {
+        position: relative;
+        isolation: isolate;
+        --box-stroke: var(--ink);
+        --box-fill: transparent;
+    }
+    .tone-navy {
+        --box-stroke: var(--azure);
+    }
+    .tone-slate {
+        --box-stroke: var(--slate);
+    }
+    .tone-frost {
+        --box-stroke: var(--frost);
+    }
+    .tone-paper {
+        --box-stroke: var(--paper);
+    }
+    .tone-paper.has-fill {
+        --box-fill: color-mix(in srgb, var(--paper) 10%, transparent);
+    }
+    .has-fill {
+        --box-fill: var(--paper-deep);
+    }
+    .tone-navy.has-fill {
+        --box-fill: var(--ice);
+    }
+    .pad-none {
+        padding: 0;
+    }
+    .pad-sm {
+        padding: var(--space-3) var(--space-4);
+    }
+    .pad-md {
+        padding: var(--space-5) var(--space-5);
+    }
+    .pad-lg {
+        padding: var(--space-6) var(--space-6);
+    }
+    .sketch-box__frame {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        overflow: visible;
+        filter: url(#pencil);
+    }
+    .sketch-box__fill {
+        fill: var(--box-fill);
+        stroke: none;
+    }
+    .sketch-box__line {
+        fill: none;
+        stroke: var(--box-stroke);
+        stroke-width: var(--stroke);
+        stroke-linejoin: round;
+        stroke-linecap: round;
+        vector-effect: non-scaling-stroke;
+    }
+    .sketch-box__line--echo {
+        opacity: 0.35;
+        --delay: 120ms;
+    }
+    .sketch-box__body {
+        position: relative;
+    }
+</style>

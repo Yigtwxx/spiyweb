@@ -1,0 +1,250 @@
+---
+/* Navy again: Dijsselhof's half-wheel web as a band, then links, the sibling tools, and the
+   credits every engraving on the page earned. Credits come from the image
+   manifest. */
+import { images } from '../data/images.generated';
+import { repo, pypi, version, siblings } from '../data/commands';
+import Halftone from './Halftone.astro';
+import Logo from './Logo.astro';
+const credits = Object.values(images).map((i) => i.credit);
+const seen = new Set<string>();
+const unique = credits.filter((c) => (seen.has(c.page_url) ? false : (seen.add(c.page_url), true)));
+---
+
+<footer class="footer" id="footer">
+    <div class="footer__band" aria-hidden="true">
+        <Halftone id="dijsselhof" tone="navy" drift="--footer-plate" sizes="100vw" />
+    </div>
+    <div class="page footer__grid">
+        <div class="footer__col">
+            <p class="footer__name">
+                <Logo size="1.3em" />
+                spiyweb <span class="footer__version">v{version}</span>
+            </p>
+            <p class="footer__tag">Not top-k. The whole web.</p>
+            <ul class="footer__links">
+                <li>
+                    <a href={repo} rel="noopener">
+                        GitHub
+                    </a>
+                </li>
+                <li>
+                    <a href={pypi} rel="noopener">
+                        PyPI
+                    </a>
+                </li>
+                <li>
+                    <a href={`${repo}/blob/main/CHANGELOG.md`} rel="noopener">
+                        Changelog
+                    </a>
+                </li>
+                <li>
+                    <a href={`${repo}/blob/main/LICENSE`} rel="noopener">
+                        Licence
+                    </a>
+                </li>
+            </ul>
+            <div class="footer__family">
+                <p class="footer__family-title">Same family</p>
+                <ul>
+                    {siblings.map((s) => (
+                        <li>
+                            <a href={s.href} rel="noopener">
+                                {s.name}
+                            </a>{' '}
+                            <span>— {s.tag}</span>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+        <details class="footer__col footer__credits">
+            <summary class="footer__credits-title">Engravings on this page</summary>
+            <ul>
+                {unique.map((c) => (
+                    <li>
+                        <a href={c.page_url} rel="noopener">
+                            {c.author}, <cite>{c.title}</cite>
+                            {c.year ? `, ${c.year}` : ''}
+                        </a>
+                        <span class="footer__licence">
+                            {' '}
+                            — {c.source},{' '}
+                            <a href={c.licence_url} rel="noopener">
+                                {c.licence}
+                            </a>
+                        </span>
+                    </li>
+                ))}
+            </ul>
+            <p class="footer__note">
+                Halftoned at build time from public-domain originals, most of them in the
+                Rijksmuseum. The pencil lines and the live web are drawn in SVG, CSS and a canvas.
+                No spider was harmed; several were engraved.
+            </p>
+        </details>
+    </div>
+</footer>
+
+<style>
+    .footer {
+        /* The plate's drift timeline: the band clips the plate, so it
+           drifts over the footer's pass instead of its own. The page ends before
+           the footer can leave, so the drift spans its entry alone. */
+        view-timeline: --footer-plate block;
+        --drift-range: entry 0% entry 100%;
+        --field: var(--navy);
+        --pen: var(--frost-soft);
+        --caption: var(--frost-soft);
+        /* the height the plate shows bare before the wash starts */
+        --band: min(46vh, 70vw);
+        position: relative;
+        isolation: isolate;
+        background: var(--navy);
+        color: var(--paper);
+        padding-bottom: var(--space-7);
+    }
+    /* The plate runs under the whole footer; a translucent navy wash
+       rises over it where the text sits, so the engraving still shows through. */
+    .footer__band {
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        overflow: hidden;
+    }
+    .footer__band :global(.halftone) {
+        aspect-ratio: auto;
+        height: 100%;
+    }
+    .footer__band :global(img) {
+        object-position: center 60%;
+    }
+    .footer::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: linear-gradient(
+            to bottom,
+            transparent calc(var(--band) * 0.55),
+            color-mix(in srgb, var(--navy) 82%, transparent) var(--band)
+        );
+    }
+    .footer__grid {
+        display: grid;
+        gap: var(--space-6);
+        padding-top: calc(var(--band) + var(--space-7));
+    }
+    @media (min-width: 48rem) {
+        .footer__grid {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+            gap: var(--space-8);
+        }
+    }
+    .footer a {
+        color: inherit;
+    }
+    .footer__name {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.35em;
+        font-family: var(--font-display);
+        font-size: var(--step-3);
+        margin: 0 0 var(--space-2);
+        font-variation-settings:
+            'opsz' 48,
+            'WONK' 1;
+    }
+    .footer__version {
+        color: var(--frost-soft);
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        margin-left: 0.4em;
+    }
+    .footer__tag {
+        font-family: var(--font-display);
+        font-style: italic;
+    }
+    .footer__links {
+        list-style: none;
+        padding: 0;
+        margin: var(--space-3) 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0 var(--space-4);
+        font-size: var(--step--1);
+    }
+    /* A taller hit area than the text, so each link is an easy tap. */
+    .footer__links a {
+        display: inline-block;
+        padding-block: 0.35rem;
+    }
+    .footer__credits {
+        font-size: var(--step--1);
+    }
+    /* Folded by default so the two columns sit at one height; the title is the
+       handle, with the pen's own caret beside it. */
+    .footer__credits-title {
+        font-family: var(--font-display);
+        font-size: var(--step-1);
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-3);
+    }
+    .footer__credits-title::-webkit-details-marker {
+        display: none;
+    }
+    .footer__credits-title::after {
+        content: '+';
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        color: var(--frost-soft);
+        transition: transform 160ms ease;
+    }
+    .footer__credits[open] .footer__credits-title {
+        margin-bottom: var(--space-3);
+    }
+    .footer__credits[open] .footer__credits-title::after {
+        transform: rotate(45deg);
+    }
+    .footer__credits-title:focus-visible {
+        outline: 2px solid var(--frost-soft);
+        outline-offset: 4px;
+    }
+    .footer__credits ul {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 var(--space-4);
+        display: grid;
+        gap: var(--space-2);
+    }
+    .footer__family {
+        margin-top: var(--space-5);
+        font-size: var(--step--1);
+    }
+    .footer__family-title {
+        font-family: var(--font-type);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--frost-soft);
+        margin: 0 0 var(--space-2);
+    }
+    .footer__family ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .footer__family span {
+        color: var(--frost-soft);
+    }
+    .footer__licence {
+        color: var(--frost-soft);
+    }
+    .footer__note {
+        color: var(--frost-soft);
+        max-width: 56ch;
+    }
+</style>

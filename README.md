@@ -334,6 +334,23 @@ iterative baseline.
   break. The full design specification and the decision log (every choice
   with its rationale and its rejected alternatives) are kept privately.
 
+## The website
+
+`site/` holds the project's landing page: a static Astro site, no UI framework,
+deployed to Vercel with `site` as the project root. The engravings are
+public-domain spider plates, halftoned at build time from
+`site/images.manifest.json`; the outputs in `site/public/images` are committed,
+so a build never fetches anything.
+
+```bash
+cd site
+npm install
+npm run dev      # local preview
+npm run build    # static output in site/dist
+npm run images   # re-halftone after editing images.manifest.json
+npm run favicon  # re-render the favicon set from scripts/favicon.source.svg
+```
+
 ## Contributing
 
 Design feedback is welcome right now — especially prior art for the

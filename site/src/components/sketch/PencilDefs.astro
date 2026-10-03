@@ -1,0 +1,81 @@
+---
+/* Shared SVG filters, rendered once per page (see Layout.astro).
+   `pencil` displaces strokes with low-frequency noise so straight lines wobble
+   like a hand-drawn one; `pencil-soft` is the same at half strength for small
+   elements, where a full wobble would eat the shape. Seeded, so every build
+   draws the same lines. */
+---
+
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <defs>
+        <filter
+            id="pencil"
+            x="-5%"
+            y="-5%"
+            width="110%"
+            height="110%"
+            color-interpolation-filters="sRGB"
+        >
+            <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.04"
+                numOctaves="3"
+                seed="7"
+                result="noise"
+            ></feTurbulence>
+            <feDisplacementMap
+                in="SourceGraphic"
+                in2="noise"
+                scale="2.2"
+                xChannelSelector="R"
+                yChannelSelector="G"
+            ></feDisplacementMap>
+        </filter>
+        <filter
+            id="pencil-soft"
+            x="-5%"
+            y="-5%"
+            width="110%"
+            height="110%"
+            color-interpolation-filters="sRGB"
+        >
+            <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.06"
+                numOctaves="2"
+                seed="11"
+                result="noise"
+            ></feTurbulence>
+            <feDisplacementMap
+                in="SourceGraphic"
+                in2="noise"
+                scale="1.2"
+                xChannelSelector="R"
+                yChannelSelector="G"
+            ></feDisplacementMap>
+        </filter>
+        <filter
+            id="pencil-grain"
+            x="-2%"
+            y="-2%"
+            width="104%"
+            height="104%"
+            color-interpolation-filters="sRGB"
+        >
+            <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.8"
+                numOctaves="1"
+                seed="3"
+                result="grain"
+            ></feTurbulence>
+            <feColorMatrix
+                in="grain"
+                type="matrix"
+                values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.55 0.45"
+                result="mask"
+            ></feColorMatrix>
+            <feComposite in="SourceGraphic" in2="mask" operator="in"></feComposite>
+        </filter>
+    </defs>
+</svg>

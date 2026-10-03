@@ -1,0 +1,57 @@
+---
+/* A horizontal pencil rule. Width is the container's; the wobble comes from the
+   filter plus a gently curved path, so no two rules on the page look identical
+   when they differ in width. */
+import type { Tone } from './SketchBox.astro';
+interface Props {
+    tone?: Tone;
+    weight?: 'thin' | 'bold';
+    draw?: boolean;
+    class?: string;
+}
+const { tone = 'ink', weight = 'thin', draw = false, class: className } = Astro.props;
+---
+
+<svg
+    class:list={['sketch-rule', `tone-${tone}`, `weight-${weight}`, className]}
+    viewBox="0 0 400 6"
+    preserveAspectRatio="none"
+    aria-hidden="true"
+    focusable="false"
+    data-draw={draw ? '' : undefined}
+>
+    <path d="M1 3.4 C 90 2.2, 180 4.2, 260 3.1 S 360 2.6, 399 3.3"></path>
+</svg>
+
+<style>
+    .sketch-rule {
+        display: block;
+        width: 100%;
+        height: 6px;
+        overflow: visible;
+        filter: url(#pencil-soft);
+        --rule-stroke: var(--ink);
+    }
+    .tone-navy {
+        --rule-stroke: var(--azure);
+    }
+    .tone-slate {
+        --rule-stroke: var(--slate);
+    }
+    .tone-frost {
+        --rule-stroke: var(--frost);
+    }
+    .tone-paper {
+        --rule-stroke: var(--paper);
+    }
+    path {
+        fill: none;
+        stroke: var(--rule-stroke);
+        stroke-width: var(--stroke);
+        stroke-linecap: round;
+        vector-effect: non-scaling-stroke;
+    }
+    .weight-bold path {
+        stroke-width: var(--stroke-bold);
+    }
+</style>

@@ -1,0 +1,95 @@
+---
+import '../styles/global.css';
+import PencilDefs from '../components/sketch/PencilDefs.astro';
+import { withBase } from '../lib/base';
+import { INDEXABLE } from '../lib/seo';
+// Preload the fonts the first paint needs, so the swap does not move the hero.
+import frauncesUrl from '@fontsource-variable/fraunces/files/fraunces-latin-full-normal.woff2?url';
+import interUrl from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url';
+import monoUrl from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2?url';
+import handUrl from '@fontsource/patrick-hand/files/patrick-hand-latin-400-normal.woff2?url';
+const preload = [frauncesUrl, interUrl, monoUrl, handUrl];
+// Browsers cache favicons apart from the page, so a hard reload does not refetch
+// them; bump this when the icon files change.
+const iconVersion = 2;
+const icon = (name: string): string => `${withBase(name)}?v=${iconVersion}`;
+
+interface Props {
+    title: string;
+    description: string;
+    noindex?: boolean;
+}
+const { title, description, noindex = false } = Astro.props;
+const hidden = noindex || !INDEXABLE; // see lib/seo.ts
+const canonical = new URL(Astro.url.pathname, Astro.site);
+// The link preview is the GitHub social preview card (pages/social.astro).
+const ogImage = new URL(withBase('social-preview.jpg'), Astro.site);
+const IMAGE_ALT =
+    'spiyweb: Not top-k. The whole web. A garden spider at the centre of its orb web, a wood engraving in ice blue on deep navy.';
+---
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script is:inline>
+            document.documentElement.classList.add('js');
+        </script>
+        <!-- Vercel Web Analytics: cookieless page views. Loaded only where Vercel serves
+             it, so a local preview has no 404 in its console. -->
+        <script is:inline>
+            window.va =
+                window.va ||
+                function () {
+                    (window.vaq = window.vaq || []).push(arguments);
+                };
+            if (location.hostname.endsWith('.vercel.app')) {
+                const s = document.createElement('script');
+                s.defer = true;
+                s.src = '/_vercel/insights/script.js';
+                document.head.appendChild(s);
+            }
+        </script>
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <link rel="canonical" href={canonical} />
+        {hidden ? <meta name="robots" content="noindex, nofollow" /> : null}
+        {preload.map((href) => (
+            <link rel="preload" as="font" type="font/woff2" href={href} crossorigin />
+        ))}
+        <link rel="icon" href={icon('favicon.svg')} type="image/svg+xml" />
+        <link rel="icon" href={icon('favicon-32.png')} sizes="32x32" type="image/png" />
+        <link rel="apple-touch-icon" href={icon('apple-touch-icon.png')} />
+        <meta name="theme-color" content="#13294b" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:image:width" content="1280" />
+        <meta property="og:image:height" content="640" />
+        <meta property="og:image:alt" content={IMAGE_ALT} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={ogImage} />
+        <meta name="twitter:image:alt" content={IMAGE_ALT} />
+        <meta name="generator" content={Astro.generator} />
+    </head>
+    <body>
+        <a class="skip-link" href="#main">
+            Skip to content
+        </a>
+        <PencilDefs />
+        <slot />
+        <script>
+            import { initStrokeDraw } from '../scripts/stroke-draw';
+            import { initHalftoneHover } from '../scripts/halftone-hover';
+            import { initReveal } from '../scripts/reveal';
+            initReveal();
+            initStrokeDraw();
+            initHalftoneHover();
+        </script>
+    </body>
+</html>

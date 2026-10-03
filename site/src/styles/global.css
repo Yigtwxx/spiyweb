@@ -1,0 +1,335 @@
+@import './tokens.css';
+
+/* fonts: subsets are unicode-range gated, only latin downloads */
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/fraunces/opsz-italic.css';
+@import '@fontsource-variable/inter/index.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/400-italic.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/patrick-hand/latin-400.css';
+
+/* Georgia scaled to Fraunces' widths (measured on the display headings), so a
+   heading set in the fallback wraps where Fraunces will: the swap does not
+   reflow the hero and push the copy under it down the page. */
+@font-face {
+    font-family: 'Fraunces Fallback';
+    src: local('Georgia');
+    size-adjust: 84.7%;
+    ascent-override: 115.7%;
+    descent-override: 30.7%;
+    line-gap-override: 0%;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    color-scheme: light;
+    background: var(--paper);
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: var(--step-0);
+    line-height: 1.6;
+    font-feature-settings: 'ss01', 'cv11';
+    overflow-x: clip;
+}
+
+/* paper grain: a fixed noise layer, multiplied into the page */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.32;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.3 0 0 0 0 0.45 0 0 0 0 0.6 0 0 0 0.3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+    background-size: 240px 240px;
+}
+
+/* the tint: frost light from the top left, navy cold from the bottom right,
+   fixed so the page reads as one sheet held up to a winter window */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 80% 60% at 8% 0%, var(--glow-frost), transparent 70%),
+        radial-gradient(ellipse 70% 60% at 100% 100%, var(--glow-navy), transparent 70%);
+}
+
+h1,
+h2,
+h3,
+h4 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 var(--space-4);
+    text-wrap: balance;
+    font-variation-settings:
+        'opsz' 96,
+        'SOFT' 30,
+        'WONK' 1;
+}
+
+h1 {
+    font-size: var(--step-6);
+    font-weight: 400;
+    font-variation-settings:
+        'opsz' 144,
+        'SOFT' 50,
+        'WONK' 1;
+}
+h2 {
+    font-size: var(--step-4);
+}
+h3 {
+    font-size: var(--step-2);
+    font-variation-settings:
+        'opsz' 48,
+        'SOFT' 20,
+        'WONK' 1;
+}
+
+p {
+    margin: 0 0 var(--space-4);
+    max-width: var(--measure);
+}
+
+a {
+    color: var(--azure);
+    text-decoration: none;
+    text-underline-offset: 0.18em;
+    text-decoration-thickness: var(--stroke);
+}
+a:hover {
+    color: var(--azure-deep);
+    text-decoration: underline;
+}
+
+code,
+kbd,
+pre,
+samp {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+}
+code:not(pre code) {
+    background: var(--paper-deep);
+    padding: 0.08em 0.35em;
+    border-radius: 2px;
+}
+
+pre {
+    margin: 0;
+    overflow-x: auto;
+    line-height: 1.5;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+}
+
+img,
+svg {
+    display: block;
+    max-width: 100%;
+}
+
+:focus-visible {
+    outline: var(--stroke-bold) solid var(--azure);
+    outline-offset: 3px;
+    border-radius: 2px;
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: var(--gutter);
+    background: var(--paper);
+    padding: var(--space-2) var(--space-3);
+    z-index: 100;
+}
+.skip-link:focus {
+    top: var(--space-2);
+}
+
+/* grid and flex children may never force the page wider than the viewport */
+:where(main, header, footer) * {
+    min-width: 0;
+}
+
+/* the page: one plate of the field guide */
+.page {
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+}
+
+/* the words that matter: emphasis in copy, in the field's pen colour, run over
+   with a frost highlighter where the ground is light */
+.key {
+    font-style: normal;
+    font-weight: 500;
+    color: var(--pen, var(--azure));
+    background: linear-gradient(
+        transparent 58%,
+        var(--key-mark, color-mix(in srgb, var(--frost) 55%, transparent)) 58%,
+        var(--key-mark, color-mix(in srgb, var(--frost) 55%, transparent)) 92%,
+        transparent 92%
+    );
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+/* field notes: written in the plate's margin, the way a naturalist annotates */
+.marginalia {
+    font-family: var(--font-hand);
+    font-weight: 400;
+    font-size: var(--step-1);
+    line-height: 1.25;
+    color: var(--pen, var(--azure));
+    max-width: 26ch;
+}
+
+/* captions under the engravings: a specimen label, quieter */
+.caption {
+    font-family: var(--font-type);
+    font-size: var(--step--1);
+    line-height: 1.4;
+    color: var(--caption, var(--ink-mute));
+}
+.caption cite {
+    font-style: italic;
+}
+
+/* the plate reference above a heading: PLATE I, FILE 03 */
+.exhibit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6em;
+    font-family: var(--font-type);
+    font-size: var(--step--1);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--pen, var(--azure));
+    margin: 0 0 var(--space-3);
+}
+.exhibit::before {
+    content: '';
+    width: 2.2em;
+    height: 0;
+    border-top: 2px dashed currentColor;
+}
+/* stroke drawing: paths are hidden until in view, then drawn like a pen.
+   Only inside no-preference so reduced-motion users get complete lines with no JS.
+
+   The transition lives on the drawn state alone. On the hidden state it also
+   animated every measurement: `--len` goes from the 4000 fallback to the real
+   length, the offset slid 4000 -> len while the dash was already len, and the
+   line flashed on and off five or six times before it was drawn. Once drawn, the
+   dash is dropped (`is-settled`), so a line that grows later (a web font landing
+   under an underline) never shows the gap of a dash measured too short. */
+@media (prefers-reduced-motion: no-preference) {
+    .js [data-draw] path,
+    .js [data-draw] line,
+    .js [data-draw] polyline,
+    .js [data-draw] circle,
+    .js [data-draw] ellipse {
+        stroke-dasharray: var(--len, 4000);
+        stroke-dashoffset: var(--len, 4000);
+    }
+    .js [data-draw].is-drawn path,
+    .js [data-draw].is-drawn line,
+    .js [data-draw].is-drawn polyline,
+    .js [data-draw].is-drawn circle,
+    .js [data-draw].is-drawn ellipse {
+        stroke-dashoffset: 0;
+        transition: stroke-dashoffset var(--draw-duration) var(--ease-pen);
+        transition-delay: var(--delay, 0ms);
+    }
+    .js [data-draw].is-settled path,
+    .js [data-draw].is-settled line,
+    .js [data-draw].is-settled polyline,
+    .js [data-draw].is-settled circle,
+    .js [data-draw].is-settled ellipse {
+        stroke-dasharray: none;
+    }
+}
+
+/* scripts/reveal.ts: the entrance choreography. `.motion` is set only when the
+   script runs and the reader has not asked for less motion, so nothing here can
+   hide content from anyone else. */
+@property --reveal {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 150%;
+}
+.motion [data-reveal] {
+    transition:
+        opacity 900ms var(--ease-silk),
+        transform 900ms var(--ease-silk),
+        filter 900ms var(--ease-silk);
+    transition-delay: var(--reveal-delay, 0ms);
+}
+.motion [data-reveal]:not(.is-in) {
+    opacity: 0;
+    transform: translateY(26px);
+    filter: blur(8px);
+}
+/* A plate develops from a point outward, like energy leaving a seed: the mask's
+   radius runs from nothing to past the corners. */
+html.motion .halftone__img:not(.halftone__img--hover) {
+    mask-image: radial-gradient(
+        circle at var(--rx, 50%) var(--ry, 45%),
+        #000 var(--reveal),
+        transparent calc(var(--reveal) + 22%)
+    );
+    transition:
+        --reveal 2200ms var(--ease-silk),
+        opacity 320ms var(--ease-pen);
+}
+html.motion .halftone:not(.is-in) .halftone__img:not(.halftone__img--hover) {
+    --reveal: -22%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

@@ -1,0 +1,229 @@
+---
+/* Sticky, quiet, on the navy field. At the top of the page the wordmark sits
+   left and the links right; once the hero has scrolled away the links fade out and
+   the wordmark slides to the centre, a running head. `scripts/nav.ts` sets
+   `data-scrolled`; everything else is CSS. */
+import { repo } from '../data/commands';
+import Logo from './Logo.astro';
+
+const links = [
+    { href: '#watch', label: 'Watch' },
+    { href: '#web', label: 'How it spreads' },
+    { href: '#trace', label: 'The trace' },
+    { href: '#different', label: 'vs top-k' },
+    { href: '#honesty', label: 'Honesty' },
+    { href: '#rules', label: 'Rules' },
+    { href: '#measured', label: 'Measured' },
+    { href: '#cli', label: 'CLI' },
+];
+---
+
+<header class="nav" data-nav-bar>
+    <span class="nav__progress" aria-hidden="true"></span>
+    <div class="page nav__row">
+        <a class="nav__brand" href="#top" aria-label="spiyweb, back to top">
+            <Logo size="1.55em" />
+            <span class="nav__name">spiyweb</span>
+        </a>
+        <nav class="nav__links" aria-label="Sections">
+            {links.map((l) => (
+                <a href={l.href} data-nav>
+                    <span>{l.label}</span>
+                    <svg
+                        class="nav__ul"
+                        viewBox="0 0 200 8"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                        focusable="false"
+                    >
+                        <path d="M2 5 C 40 2.5, 80 6.5, 120 4 S 180 3, 198 5.5"></path>
+                    </svg>
+                </a>
+            ))}
+            <a href={repo} rel="noopener">
+                <span>GitHub</span>
+                <svg
+                    class="nav__ul"
+                    viewBox="0 0 200 8"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                    focusable="false"
+                >
+                    <path d="M2 5 C 40 2.5, 80 6.5, 120 4 S 180 3, 198 5.5"></path>
+                </svg>
+            </a>
+        </nav>
+    </div>
+</header>
+
+<style>
+    .nav {
+        --field: var(--navy);
+        --nav-move: 520ms;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        color: var(--paper);
+        backdrop-filter: blur(6px);
+        /* 92%, not less: paper text needs 4.5:1 over what shows through (4.84 here;
+           82% gave 4.21 over the paper page). */
+        background: color-mix(in srgb, var(--field) 92%, transparent);
+        border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+    }
+    /* How far down the page the reader is: a frost thread along the bar's lower
+       edge, drawn by the scroll itself. */
+    .nav__progress {
+        display: none;
+    }
+    @supports (animation-timeline: scroll()) {
+        @media (prefers-reduced-motion: no-preference) {
+            .nav__progress {
+                display: block;
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: -1px;
+                height: 2px;
+                background: linear-gradient(90deg, var(--frost), var(--frost-soft));
+                box-shadow: 0 0 10px color-mix(in srgb, var(--frost) 70%, transparent);
+                transform-origin: left;
+                /* Longhands: see Halftone.astro on the minifier and timelines. */
+                animation-name: nav-progress;
+                animation-timing-function: linear;
+                animation-fill-mode: both;
+                animation-timeline: scroll(root block);
+            }
+        }
+    }
+    @keyframes nav-progress {
+        from {
+            transform: scaleX(0);
+        }
+        to {
+            transform: scaleX(1);
+        }
+    }
+    .nav__row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-4);
+        min-height: 3.5rem;
+    }
+    /* The wordmark is placed, not flowed, so its move to the centre can ease:
+       `left` and the transform carry it, nothing reflows. */
+    .nav__brand {
+        position: absolute;
+        top: 50%;
+        left: var(--gutter);
+        transform: translate(0, -50%);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: inherit;
+        text-decoration: none;
+        font-family: var(--font-display);
+        font-size: var(--step-1);
+        font-variation-settings:
+            'opsz' 24,
+            'WONK' 1;
+        transition:
+            left var(--nav-move) var(--ease-pen),
+            transform var(--nav-move) var(--ease-pen);
+    }
+    .nav[data-scrolled] .nav__brand {
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    .nav__brand:hover {
+        text-decoration: none;
+        color: inherit;
+    }
+    .nav__links {
+        display: flex;
+        gap: clamp(0.75rem, 2.5vw, 1.75rem);
+        font-size: var(--step--1);
+        transition:
+            opacity 320ms var(--ease-pen),
+            visibility 0s linear 0s;
+    }
+    /* Faded, then out of the tab order once the fade has run. */
+    .nav[data-scrolled] .nav__links {
+        opacity: 0;
+        visibility: hidden;
+        transition:
+            opacity 320ms var(--ease-pen),
+            visibility 0s linear 320ms;
+    }
+    .nav__links a {
+        position: relative;
+        display: inline-block;
+        color: inherit;
+        text-decoration: none;
+        padding-block: 0.25rem;
+    }
+    .nav__ul {
+        position: absolute;
+        left: -0.1em;
+        right: -0.1em;
+        bottom: -0.05em;
+        width: calc(100% + 0.2em);
+        height: 0.32em;
+        overflow: visible;
+        filter: url(#pencil-soft);
+        pointer-events: none;
+    }
+    .nav__ul path {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: var(--stroke-bold);
+        stroke-linecap: round;
+        vector-effect: non-scaling-stroke;
+        stroke-dasharray: 240;
+        stroke-dashoffset: 240;
+        transition: stroke-dashoffset 320ms var(--ease-pen);
+    }
+    .nav__links a:hover .nav__ul path,
+    .nav__links a:focus-visible .nav__ul path,
+    .nav__links a[aria-current='true'] .nav__ul path {
+        stroke-dashoffset: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .nav__ul path {
+            stroke-dasharray: none;
+            opacity: 0;
+            transition: opacity 0.01ms;
+        }
+        .nav__links a:hover .nav__ul path,
+        .nav__links a:focus-visible .nav__ul path,
+        .nav__links a[aria-current='true'] .nav__ul path {
+            opacity: 1;
+        }
+    }
+    /* Tablet: the full row ran into the wordmark under ~755 px and sat 14 px from it
+       at 780. The two links whose sections are nearest a neighbour go first. */
+    @media (max-width: 72rem) {
+        .nav__links [href='#honesty'],
+        .nav__links [href='#different'],
+        .nav__links [href='#measured'] {
+            display: none;
+        }
+    }
+    @media (max-width: 56rem) {
+        .nav__links [href='#trace'],
+        .nav__links [href='#rules'] {
+            display: none;
+        }
+    }
+    @media (max-width: 40rem) {
+        .nav__links [data-nav]:not([href='#watch']) {
+            display: none;
+        }
+    }
+</style>
+
+<script>
+    import { initNav } from '../scripts/nav';
+    initNav();
+</script>

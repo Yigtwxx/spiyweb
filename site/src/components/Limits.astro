@@ -1,0 +1,140 @@
+---
+/* The known limits as a ledger on paper, with Hokusai's web in the margin. */
+import { limits } from '../data/limits';
+import { mark } from '../lib/mark';
+import Halftone from './Halftone.astro';
+import SketchRule from './sketch/SketchRule.astro';
+import SketchArrow from './sketch/SketchArrow.astro';
+---
+
+<div class="limits">
+    <ol class="limits__list">
+        {limits.map((l, i) => (
+            <li class="limit">
+                <span class="limit__n" aria-hidden="true">
+                    {String(i + 1).padStart(2, '0')}
+                </span>
+                <h3 class="limit__title">{l.title}</h3>
+                <p class="limit__body" set:html={mark(l.body)} />
+                <div class="limit__rule">
+                    <SketchRule tone="ink" />
+                </div>
+            </li>
+        ))}
+    </ol>
+    <aside class="limits__aside">
+        <p class="limits__label">open items</p>
+        <div class="limits__note">
+            <SketchArrow direction="curve-left" size={52} />
+            <p class="marginalia">
+                Each of these is written down in the repository. A fixed one leaves this list; none
+                is hidden while it stands.
+            </p>
+        </div>
+        <figure class="limits__plate">
+            <Halftone
+                id="hokusai"
+                tone="paper"
+                hover="azure"
+                sizes="(min-width: 64rem) 14rem, 60vw"
+            />
+            <figcaption class="caption">
+                Katsushika Hokusai, <cite>Fuji behind a spider web</cite>, c. 1835. Some of the view
+                always falls between the threads.
+            </figcaption>
+        </figure>
+    </aside>
+</div>
+
+<style>
+    .limits {
+        display: grid;
+        gap: var(--space-6);
+    }
+    @media (min-width: 64rem) {
+        .limits {
+            grid-template-columns: minmax(0, 1fr) var(--margin-col);
+            gap: var(--space-8);
+            align-items: start;
+        }
+    }
+    .limits__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: var(--space-5) var(--space-7);
+    }
+    @media (min-width: 48rem) {
+        .limits__list {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    .limit {
+        position: relative;
+        display: grid;
+        align-content: start;
+        gap: var(--space-2);
+        padding-bottom: var(--space-5);
+    }
+    .limit__n {
+        font-family: var(--font-type);
+        font-size: var(--step-1);
+        line-height: 1;
+        color: var(--azure);
+    }
+    .limit__title {
+        font-size: var(--step-1);
+        line-height: 1.25;
+        margin: 0;
+        max-width: 28ch;
+    }
+    .limit__body {
+        margin: 0;
+        color: var(--ink-soft);
+    }
+    .limit__rule {
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+    }
+    .limits__aside {
+        display: grid;
+        gap: var(--space-5);
+        justify-items: start;
+    }
+    .limits__note {
+        display: flex;
+        gap: var(--space-2);
+        align-items: flex-start;
+    }
+    .limits__note :global(svg) {
+        flex: none;
+    }
+    .limits__note .marginalia {
+        margin: 0;
+    }
+    .limits__label {
+        margin: 0;
+        font-family: var(--font-type);
+        font-size: var(--step--1);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--azure);
+        border: 1px dashed currentColor;
+        padding: 0.15em 0.6em;
+    }
+    /* A tall print: kept small under the list on a phone, larger in the margin. */
+    .limits__plate {
+        width: min(100%, 11rem);
+        margin: var(--space-3) 0 0;
+    }
+    .limits__plate figcaption {
+        margin-top: var(--space-2);
+    }
+    @media (min-width: 64rem) {
+        .limits__plate {
+            width: min(100%, 15rem);
+        }
+    }
+</style>

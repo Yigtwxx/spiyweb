@@ -1,0 +1,65 @@
+---
+/* A pencil arrow, for pointing from a margin note at the thing it talks about. */
+interface Props {
+    direction?: 'right' | 'down' | 'left' | 'curve-right' | 'curve-left' | 'curve-down';
+    size?: number;
+    tone?: 'ink' | 'navy' | 'slate' | 'paper' | 'frost';
+    draw?: boolean;
+    class?: string;
+}
+const {
+    direction = 'right',
+    size = 64,
+    tone = 'navy',
+    draw = true,
+    class: className,
+} = Astro.props;
+
+const paths: Record<NonNullable<Props['direction']>, string> = {
+    right: 'M4 32 C 24 30, 44 33, 60 31 M50 22 C 55 26, 58 29, 61 31 C 57 33, 54 36, 51 40',
+    left: 'M60 32 C 40 30, 20 33, 4 31 M14 22 C 9 26, 6 29, 3 31 C 7 33, 10 36, 13 40',
+    down: 'M32 4 C 30 24, 33 44, 31 60 M22 50 C 26 55, 29 58, 31 61 C 33 57, 36 54, 40 51',
+    'curve-right': 'M6 52 C 10 30, 30 12, 58 14 M50 6 C 54 9, 57 12, 59 14 C 55 16, 52 20, 50 24',
+    'curve-left': 'M58 52 C 54 30, 34 12, 6 14 M14 6 C 10 9, 7 12, 5 14 C 9 16, 12 20, 14 24',
+    'curve-down': 'M6 10 C 30 8, 54 22, 52 58 M43 50 C 46 54, 49 57, 52 59 C 54 55, 57 52, 61 49',
+};
+---
+
+<svg
+    class:list={['sketch-arrow', `tone-${tone}`, className]}
+    viewBox="0 0 64 64"
+    width={size}
+    height={size}
+    aria-hidden="true"
+    focusable="false"
+    data-draw={draw ? '' : undefined}
+>
+    <path d={paths[direction]}></path>
+</svg>
+
+<style>
+    .sketch-arrow {
+        overflow: visible;
+        filter: url(#pencil-soft);
+        --arrow-stroke: var(--azure);
+    }
+    .tone-ink {
+        --arrow-stroke: var(--ink);
+    }
+    .tone-slate {
+        --arrow-stroke: var(--slate);
+    }
+    .tone-frost {
+        --arrow-stroke: var(--frost);
+    }
+    .tone-paper {
+        --arrow-stroke: var(--paper);
+    }
+    path {
+        fill: none;
+        stroke: var(--arrow-stroke);
+        stroke-width: var(--stroke-bold);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+</style>

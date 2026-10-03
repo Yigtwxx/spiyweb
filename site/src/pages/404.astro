@@ -1,0 +1,93 @@
+---
+/* Not found, in the tool's own words: an address with nothing behind it is a
+   seed that lit nothing, reported the way a weak retrieval is. */
+import Layout from '../layouts/Layout.astro';
+import Halftone from '../components/Halftone.astro';
+import SketchBox from '../components/sketch/SketchBox.astro';
+import SketchUnderline from '../components/sketch/SketchUnderline.astro';
+import { withBase } from '../lib/base';
+---
+
+<Layout title="Not found — spiyweb" description="There is nothing at this address." noindex>
+    <main class="lost" id="main">
+        <div class="page lost__grid">
+            <div class="lost__copy">
+                <p class="lost__code">
+                    seed {'{'}this address{'}'} → 0 nodes lit
+                </p>
+                <h1 class="lost__title">
+                    This thread leads{' '}
+                    <SketchUnderline tone="navy" draw>
+                        nowhere.
+                    </SketchUnderline>
+                </h1>
+                <SketchBox padding="md" draw class="lost__finding">
+                    <p class="lost__line">refusal report · confidence 0.00</p>
+                    <p class="lost__detail">
+                        <b>why</b> — no passage answers at this address. It may be mistyped, or the
+                        page has moved.
+                    </p>
+                    <p class="lost__detail">
+                        <b>next</b> — go back to the hub and drop the question in again.
+                    </p>
+                </SketchBox>
+                <p class="lost__back">
+                    <a href={withBase('/')}>Back to the web</a>
+                </p>
+            </div>
+            <figure class="lost__figure">
+                <Halftone id="foxglove" tone="paper" vignette loading="eager" sizes="18rem" />
+            </figure>
+        </div>
+    </main>
+</Layout>
+
+<style>
+    .lost {
+        min-height: 100vh;
+        display: grid;
+        align-items: center;
+        padding-block: var(--space-8);
+    }
+    .lost__grid {
+        display: grid;
+        gap: var(--space-7);
+        align-items: center;
+    }
+    @media (min-width: 64rem) {
+        .lost__grid {
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        }
+    }
+    .lost__code {
+        font-family: var(--font-mono);
+        font-size: var(--step--1);
+        color: var(--navy);
+        margin: 0 0 var(--space-4);
+    }
+    .lost__title {
+        font-size: var(--step-5);
+        margin: 0 0 var(--space-6);
+        max-width: 14ch;
+    }
+    .lost__line {
+        margin: 0 0 var(--space-3);
+    }
+    .lost__detail {
+        margin: 0 0 var(--space-2);
+        color: var(--ink-soft);
+        max-width: 42ch;
+    }
+    .lost__back {
+        margin: var(--space-6) 0 0;
+        font-size: var(--step-1);
+    }
+    .lost__back a {
+        color: var(--navy);
+    }
+    .lost__figure {
+        margin: 0;
+        max-width: 22rem;
+        justify-self: center;
+    }
+</style>

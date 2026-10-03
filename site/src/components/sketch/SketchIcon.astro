@@ -1,0 +1,83 @@
+---
+/* A small pencil pictogram, drawn with the same stroke and grain as the arrows.
+   Kept to a handful of lines each, so they read as marks in a notebook rather than
+   as an icon set. `draw` animates the stroke on scroll. */
+export type IconName =
+    | 'doc'
+    | 'book'
+    | 'globe'
+    | 'bubble'
+    | 'key'
+    | 'spark'
+    | 'window'
+    | 'scan'
+    | 'oldfile'
+    | 'lock'
+    | 'nopost'
+    | 'search'
+    | 'web'
+    | 'scale';
+interface Props {
+    name: IconName;
+    tone?: 'ink' | 'navy' | 'slate' | 'paper';
+    size?: number;
+    draw?: boolean;
+}
+const { name, tone = 'ink', size = 44, draw = false } = Astro.props;
+
+const page = 'M12 6 H30 L38 14 V42 H12 Z M30 6 V14 H38';
+const bubble = 'M8 10 H40 V32 H22 L14 40 V32 H8 Z';
+const paths: Record<IconName, string> = {
+    doc: `${page} M17 22 H33 M17 28 H33 M17 34 H27`,
+    web: 'M24 24 L24 5 M24 24 L40 14 M24 24 L40 34 M24 24 L24 43 M24 24 L8 34 M24 24 L8 14 M24 12 L34 18 L34 30 L24 36 L14 30 L14 18 Z M24 18 L29 21 L29 27 L24 30 L19 27 L19 21 Z',
+    scale: 'M24 8 V40 M15 40 H33 M9 14 H39 M9 14 L4 27 H14 Z M39 14 L34 27 H44 Z',
+    book: 'M8 12 C 16 9, 22 10, 24 14 C 26 10, 32 9, 40 12 V38 C 32 35, 26 36, 24 40 C 22 36, 16 35, 8 38 Z M24 14 V40',
+    globe: 'M24 6 A18 18 0 1 0 24.01 6 M6 24 H42 M24 6 C 15 14, 15 34, 24 42 M24 6 C 33 14, 33 34, 24 42',
+    bubble: `${bubble} M14 18 H34 M14 24 H28`,
+    key: 'M7 30 A7 7 0 1 0 21 30 A7 7 0 1 0 7 30 M21 30 H42 M35 30 V36 M40 30 V35',
+    spark: 'M24 6 L27 21 L42 24 L27 27 L24 42 L21 27 L6 24 L21 21 Z',
+    window: 'M6 10 H42 V38 H6 Z M6 17 H42 M10 13.5 H12 M15 13.5 H17',
+    scan: 'M12 6 H36 V42 H12 Z M16 35 L22 26 L27 31 L31 27 L33 35 Z M19 16 A3 3 0 1 0 19.01 16',
+    oldfile: `${page} M18 22 L32 36 M32 22 L18 36`,
+    lock: 'M13 22 H35 V41 H13 Z M18 22 V16 C 18 8, 30 8, 30 16 V22 M24 29 V34',
+    nopost: `${bubble} M6 6 L42 42`,
+    search: 'M20 8 A12 12 0 1 0 20.01 8 M29 29 L40 40',
+};
+---
+
+<svg
+    class:list={['sketch-icon', `tone-${tone}`]}
+    viewBox="0 0 48 48"
+    width={size}
+    height={size}
+    aria-hidden="true"
+    focusable="false"
+    data-draw={draw ? '' : undefined}
+>
+    <path d={paths[name]}></path>
+</svg>
+
+<style>
+    .sketch-icon {
+        flex: none;
+        overflow: visible;
+        filter: url(#pencil-soft);
+        --icon-stroke: var(--ink);
+    }
+    .tone-navy {
+        --icon-stroke: var(--azure);
+    }
+    .tone-slate {
+        --icon-stroke: var(--slate);
+    }
+    .tone-paper {
+        --icon-stroke: var(--paper);
+    }
+    path {
+        fill: none;
+        stroke: var(--icon-stroke);
+        stroke-width: var(--stroke-bold);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+</style>

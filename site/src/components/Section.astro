@@ -1,0 +1,97 @@
+---
+/* A page section with a plate mark, a display heading and an optional field
+   note. `field` chooses the ground: paper (default), ice, or navy. */
+interface Props {
+    id: string;
+    title: string;
+    /** The reference set above the heading: "Plate I", "File 03". */
+    exhibit?: string;
+    field?: 'paper' | 'ice' | 'navy';
+    margin?: string;
+    /** A hairline on top, for a section that follows one on the same ground. */
+    ruled?: boolean;
+    class?: string;
+}
+const {
+    id,
+    title,
+    exhibit,
+    field = 'paper',
+    margin,
+    ruled = false,
+    class: className,
+} = Astro.props;
+---
+
+<section
+    class:list={['section', `section--${field}`, { 'section--ruled': ruled }, className]}
+    id={id}
+    aria-labelledby={`${id}-title`}
+>
+    <div class="page">
+        <header class="section__head">
+            <div>
+                {exhibit ? <p class="exhibit">{exhibit}</p> : null}
+                <h2 id={`${id}-title`} class="section__title">
+                    {title}
+                </h2>
+            </div>
+            {margin ? <p class="marginalia section__margin">{margin}</p> : null}
+        </header>
+        <slot />
+    </div>
+</section>
+
+<style>
+    .section {
+        padding-block: var(--space-8);
+    }
+    /* Paper sections let the tinted sheet behind them show through. */
+    .section--paper {
+        --field: var(--paper);
+        color: var(--ink);
+    }
+    /* Ice: the colder ground, a band of frost between paper and night. */
+    .section--ice {
+        --field: var(--ice);
+        --pen: var(--azure-deep);
+        --caption: var(--ink-mute);
+        --paper-line: var(--ice-line);
+        background: var(--ice);
+        color: var(--ink);
+    }
+    .section--ruled {
+        border-top: 1px dashed var(--paper-line);
+    }
+    .section--navy {
+        --field: var(--navy);
+        --pen: var(--frost);
+        --caption: var(--frost-soft);
+        --key-mark: color-mix(in srgb, var(--frost) 16%, transparent);
+        background: var(--navy);
+        color: var(--paper);
+    }
+    .section__head {
+        display: grid;
+        gap: var(--space-4);
+        align-items: end;
+        margin-bottom: var(--space-6);
+    }
+    @media (min-width: 64rem) {
+        .section__head {
+            grid-template-columns: minmax(0, 1fr) var(--margin-col);
+            gap: var(--space-6);
+        }
+    }
+    .section__title {
+        margin: 0;
+        font-size: var(--step-5);
+        max-width: 18ch;
+    }
+    .section--navy .section__title {
+        color: var(--paper);
+    }
+    .section__margin {
+        margin: 0;
+    }
+</style>
