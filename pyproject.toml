@@ -66,6 +66,14 @@ path = "src/spiyweb/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/spiyweb"]
 
+# The monitor's attach folder is ignored by a `*` in its own `.gitignore`,
+# which hatch does not read, so a local `traces.jsonl` rode along in the
+# 0.2.1 and 0.2.2 sdists. `site/` is the landing page - an Astro project
+# with its own images - and nothing in the package builds from it; it took
+# the 0.2.2 sdist from 1 MB to 4.5 MB. Named here, both stay out.
+[tool.hatch.build.targets.sdist]
+exclude = [".spiyweb", "site"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"
