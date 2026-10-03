@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from spiyweb.config import TraceConfig
+from spiyweb.core.dedup import votes_of
 from spiyweb.core.propagate import Activation, PropagationResult
 from spiyweb.ledger import build_ledger
 from spiyweb.output import activation_paths, theme_clusters
@@ -977,10 +978,7 @@ def _merge_colors(colored: ColoredResult) -> PropagationResult:
         colored.per_color.items(), key=lambda item: (-item[1].hops_used, item[0])
     )
     deepest = results[0][1]
-    votes: dict[str, int] = {}
-    for _, result in sorted(colored.per_color.items()):
-        for key, count in result.votes.items():
-            votes[key] = votes.get(key, 1) + (count - 1)
+    supporters = colored.supporters()
     suppressed: dict[str, str] = {}
     taus: list[float] = []
     for _, result in sorted(colored.per_color.items()):
@@ -994,7 +992,8 @@ def _merge_colors(colored: ColoredResult) -> PropagationResult:
         threshold=max(result.threshold for result in colored.per_color.values()),
         hops_used=deepest.hops_used,
         stop_reason=deepest.stop_reason,
-        votes=votes,
+        votes=votes_of(supporters),
+        supporters=supporters,
         suppressed=suppressed,
         dedup_thresholds=tuple(taus),
         conflicts=tuple(

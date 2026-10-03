@@ -28,6 +28,7 @@ from spiyweb.config import (
     PolarityConfig,
     PropagationConfig,
 )
+from spiyweb.core.dedup import merge_support, votes_of
 from spiyweb.core.propagate import PropagationResult, propagate
 
 if TYPE_CHECKING:
@@ -70,19 +71,19 @@ class ColoredResult:
                 combined[node] = combined.get(node, 0.0) + activation.energy
         return sorted(combined.items(), key=lambda item: (-item[1], item[0]))
 
+    def supporters(self) -> dict[str, frozenset[str]]:
+        """Each idea's supporting sources, unioned across colours."""
+        return merge_support(*(r.supporters for r in self.per_color.values()))
+
     def votes(self) -> dict[str, int]:
         """Corpus support per idea, merged across colours.
 
-        Each colour's web counts `1 + suppressed duplicates` for a surviving
-        idea; the merge keeps the single base vote and sums the suppressions,
-        so an idea that absorbed one duplicate in each of two colours reports
-        3, not 4. Ideas that never absorbed a duplicate are not listed.
+        The merge unions each colour's supporting sources rather than adding
+        counts: one source found by two colours is still one source, and two
+        different sources found one per colour are two. Ideas nobody
+        supported are not listed.
         """
-        combined: dict[str, int] = {}
-        for result in self.per_color.values():
-            for key, count in result.votes.items():
-                combined[key] = combined.get(key, 1) + (count - 1)
-        return combined
+        return votes_of(self.supporters())
 
 
 def propagate_colored(

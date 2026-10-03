@@ -39,6 +39,27 @@ regression suite, and its CLI flags are not covered by the policy above.
   the index directory, so rerunning an interrupted build resumes it. The
   LLM entity fallback stays off: the flag adds one thing.
 
+### Changed
+
+- **Votes count distinct sources, not suppressed copies.** An idea's vote
+  is now 1 plus the number of OTHER sources found restating it. A copy from
+  the idea's own source supports nothing - a document restating itself is
+  not a second document agreeing - and one other source counts once however
+  many copies it holds, at however many stages (contact selection, seed
+  injection, each hop) and in however many colours it was suppressed.
+  Suppression is untouched: the edge still goes to zero, the share is still
+  redistributed, the energy ranking is identical. Both cases are the norm on
+  a two-layer index, where a passage's propositions restate it and each
+  other: a three-document corpus indexed with `--propositions` reported
+  nine votes on one document, now one, and with an exact copy of that
+  document added, two. The distinct-source refill's skips (two seeds on one
+  passage) are always same-source, so they stop voting. Without a source
+  mapping every node is its own source, as before. `PropagationResult`
+  gains `supporters`, `RetrievalResult` and `ColoredRetrievalResult` gain
+  `contact_supporters`, and `ColoredResult` gains `supporters()`; every
+  vote merge unions these instead of adding counts. No measured number
+  moves: no metric reads votes, and the harness ran with dedup off.
+
 ### Fixed
 
 - The README and the landing page told newcomers to download

@@ -178,10 +178,11 @@ def test_opening_an_index_wires_both_halves_of_dedup(tmp_path: Path) -> None:
         "a similarity backend as well"
     )
     # alpha:0 and alpha:1 are two passages of ONE document, so the source
-    # rule keeps one seed slot for the document and votes the other.
-    assert answer.votes()["alpha"] == 2
+    # rule keeps one seed slot for the document and skips the other - which
+    # is the document restating itself, not a second source agreeing.
     assert answer.result.contact_suppressed == {"alpha:1": "alpha:0"}
-    assert answer.passages[0].votes == 2
+    assert "alpha" not in answer.votes()
+    assert answer.passages[0].votes == 1
 
 
 def test_a_query_embedded_by_another_model_is_refused(tmp_path: Path) -> None:

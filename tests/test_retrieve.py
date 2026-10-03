@@ -125,13 +125,15 @@ def test_the_result_contract_is_deliberately_partial() -> None:
         "propagation",
         "contact_suppressed",
         "contact_votes",
+        "contact_supporters",
         "contact_tau",
         "dedup_mode",
     }, (
         "the full §2.5 contract (paths, clusters, gaps, refusal) grows "
         "additively and on purpose - the contact_* fields are the elastic "
-        "refill's ledger (2026-08-14 A1 decision); if you extended this "
-        "again, update this test alongside the contract"
+        "refill's ledger (2026-08-14 A1 decision), contact_supporters the "
+        "sources behind its votes (2026-10-03); if you extended this again, "
+        "update this test alongside the contract"
     )
 
 
@@ -278,7 +280,10 @@ def test_a_second_seed_on_the_same_passage_is_a_twin_and_refills() -> None:
         "the colour must reach a SECOND passage, not a second sentence of the first one"
     )
     assert result.contact_suppressed == {"p1#p3": "p1#p0"}
-    assert result.votes()["p1#p0"] == 2, "a skipped twin is corpus support"
+    assert "p1#p0" not in result.votes(), (
+        "a second sentence of the same passage is not a second source - "
+        "skipped and refilled, but never a vote (2026-10-03)"
+    )
     assert result.contact_tau is None, "no cosine test ran, so no cut to report"
 
 
@@ -458,3 +463,26 @@ def test_a_profile_clears_the_bar() -> None:
             warnings.simplefilter("error")
             _check_propagation_can_spread(five, settings)
         assert isinstance(settings, PropagationConfig), name
+
+
+def test_a_source_supporting_at_contact_and_in_the_web_votes_once() -> None:
+    """The two suppression stages merge supporter sets, not increments."""
+    from spiyweb.core.propagate import PropagationResult
+    from spiyweb.retrieve import RetrievalResult
+
+    propagation = PropagationResult(
+        activations={},
+        injected_energy=10.0,
+        threshold=1.5,
+        hops_used=0,
+        stop_reason="threshold",
+        votes={"doc": 2},
+        supporters={"doc": frozenset({"other"})},
+    )
+    result = RetrievalResult(
+        seeds={},
+        propagation=propagation,
+        contact_votes={"doc": 2},
+        contact_supporters={"doc": frozenset({"other"})},
+    )
+    assert result.votes() == {"doc": 2}

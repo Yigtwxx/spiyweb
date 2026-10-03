@@ -146,6 +146,78 @@ def test_votes_use_source_granularity_when_mapped() -> None:
     assert result.votes == {"doc-1": 2}
 
 
+def test_a_duplicate_from_the_same_source_is_suppressed_but_never_votes() -> None:
+    """Support is counted per SOURCE, so a source cannot vote for itself.
+
+    On a two-layer index a passage's propositions restate it and each other;
+    each one suppressed used to add a vote to its own document, and a
+    three-document corpus reported nine votes. Suppression is unchanged - the
+    edge still goes to zero and the share is still redistributed - only the
+    ledger of corpus support no longer counts the source twice.
+    """
+    graph = Graph.from_edges(LIVE_DUP_EDGES)
+    same = propagate(
+        graph,
+        CANONICAL_SEEDS,
+        PropagationConfig(),
+        similarity=DUP_SIMILARITY,
+        dedup=FLOOR_ONLY,
+        source_of={"A": "doc-1", "A_dup": "doc-1"},
+    )
+    distinct = propagate(
+        graph,
+        CANONICAL_SEEDS,
+        PropagationConfig(),
+        similarity=DUP_SIMILARITY,
+        dedup=FLOOR_ONLY,
+        source_of={"A": "doc-1", "A_dup": "doc-2"},
+    )
+    assert same.suppressed == distinct.suppressed == {"A_dup": "A"}
+    assert same.ranked() == distinct.ranked(), "the energy ledger is identical"
+    assert same.votes == {}
+    assert distinct.votes == {"doc-1": 2}
+
+
+def test_one_other_source_is_one_vote_however_many_copies_it_holds() -> None:
+    """Votes count distinct SOURCES, not suppressed nodes.
+
+    Two propositions of one passage restating another document's idea are
+    one document agreeing, not two. Both are still suppressed.
+    """
+    graph = Graph.from_edges(
+        [("A", "A_dup1", 0.95), ("A", "A_dup2", 0.95), ("A", "B", 0.8)]
+    )
+    similarity = pair_similarity(
+        {
+            frozenset(("A", "A_dup1")): 0.95,
+            frozenset(("A", "A_dup2")): 0.95,
+            frozenset(("A_dup1", "A_dup2")): 0.95,
+        }
+    )
+    result = propagate(
+        graph,
+        {"A": 1.0},
+        PropagationConfig(),
+        similarity=similarity,
+        dedup=FLOOR_ONLY,
+        source_of={"A": "doc-1", "A_dup1": "doc-2", "A_dup2": "doc-2", "B": "doc-3"},
+    )
+    assert result.suppressed == {"A_dup1": "A", "A_dup2": "A"}
+    assert result.supporters == {"doc-1": frozenset({"doc-2"})}
+    assert result.votes == {"doc-1": 2}
+
+
+def test_without_a_source_mapping_every_copy_is_its_own_source() -> None:
+    graph = Graph.from_edges([("A", "A_dup1", 0.95), ("A", "A_dup2", 0.95)])
+    similarity = pair_similarity(
+        {frozenset(("A", "A_dup1")): 0.95, frozenset(("A", "A_dup2")): 0.95}
+    )
+    result = propagate(
+        graph, {"A": 1.0}, PropagationConfig(), similarity=similarity, dedup=FLOOR_ONLY
+    )
+    assert result.votes == {"A": 3}
+
+
 def test_adaptive_threshold_falls_back_to_floor_below_min_pairs() -> None:
     similarity = pair_similarity({frozenset(("x", "y")): 0.99})
     config = DedupConfig(floor=0.85, min_pairs=2)
@@ -262,6 +334,19 @@ def test_seed_votes_use_source_granularity_when_mapped() -> None:
     assert result.votes == {"doc-1": 2}
 
 
+def test_a_seed_twin_from_the_same_source_is_dropped_but_never_votes() -> None:
+    result = propagate(
+        Graph.from_edges(UNRELATED_GRAPH_EDGES),
+        {"A": 0.9, "A2": 0.88},
+        PropagationConfig(),
+        similarity=SEED_TWIN_SIMILARITY,
+        dedup=FLOOR_ONLY,
+        source_of={"A": "doc-1", "A2": "doc-1"},
+    )
+    assert result.suppressed == {"A2": "A"}
+    assert result.votes == {}
+
+
 def test_colored_webs_dedup_independently_and_merge_votes() -> None:
     """One suppressed duplicate per colour on the same source -> 3, not 4."""
     graph = Graph.from_edges([("S1", "D1", 0.9), ("S2", "D2", 0.9)])
@@ -280,3 +365,22 @@ def test_colored_webs_dedup_independently_and_merge_votes() -> None:
     assert result.per_color["c1"].suppressed == {"D2": "S2"}
     assert result.per_color["c0"].votes == {"doc": 2}
     assert result.votes() == {"doc": 3}
+
+
+def test_one_supporting_source_across_two_colours_is_one_vote() -> None:
+    """The colour merge unions supporters; it no longer sums suppressions."""
+    graph = Graph.from_edges([("S1", "D1", 0.9), ("S2", "D2", 0.9)])
+    similarity = pair_similarity(
+        {frozenset(("S1", "D1")): 0.96, frozenset(("S2", "D2")): 0.96}
+    )
+    result = propagate_colored(
+        graph,
+        {"c0": {"S1": 1.0}, "c1": {"S2": 1.0}},
+        PropagationConfig(),
+        similarity=similarity,
+        dedup=FLOOR_ONLY,
+        source_of={"S1": "doc", "S2": "doc", "D1": "other", "D2": "other"},
+    )
+    assert result.per_color["c0"].votes == {"doc": 2}
+    assert result.per_color["c1"].votes == {"doc": 2}
+    assert result.votes() == {"doc": 2}

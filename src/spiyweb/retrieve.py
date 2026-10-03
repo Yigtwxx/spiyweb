@@ -31,7 +31,12 @@ from spiyweb.config import (
     RetrievalConfig,
 )
 from spiyweb.core.colors import propagate_colored
-from spiyweb.core.dedup import adaptive_threshold, find_survivor
+from spiyweb.core.dedup import (
+    adaptive_threshold,
+    find_survivor,
+    merge_support,
+    votes_of,
+)
 from spiyweb.core.negative import negative_field
 from spiyweb.core.propagate import propagate
 
@@ -100,6 +105,9 @@ class RetrievalResult:
     elastic refill's ledger; empty while dedup is off)."""
     contact_votes: Mapping[str, int] = field(default_factory=dict)
     """Votes earned at contact selection, same keying as propagation votes."""
+    contact_supporters: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    """The sources behind `contact_votes`; `votes()` unions these with the
+    propagation's, so a source found at both stages counts once."""
     contact_tau: float | None = None
     """The adaptive cut used at contact selection - visible, as required."""
     dedup_mode: str = "off"
@@ -121,13 +129,13 @@ class RetrievalResult:
     def votes(self) -> dict[str, int]:
         """Corpus support per idea, merged across BOTH suppression stages.
 
-        Contact-stage and propagation-stage votes each carry an implicit
-        baseline of 1, so the merge adds only the increments.
+        The stages' supporting sources are unioned, never their counts
+        added: a source found at contact selection and again in the web is
+        one source.
         """
-        merged = dict(self.propagation.votes)
-        for key, count in self.contact_votes.items():
-            merged[key] = merged.get(key, 1) + (count - 1)
-        return merged
+        return votes_of(
+            merge_support(self.propagation.supporters, self.contact_supporters)
+        )
 
     @property
     def confidence(self) -> Confidence:
@@ -222,9 +230,11 @@ def retrieve(
         query_embedding,
         _contact_depth(cfg.seed_width, cfg.contact_overfetch, similarity, dedup),
     )
+    source_key = _source_key(graph, source_of)
     seeds, contact_suppressed, contact_tau = _select_contacts(
-        contacts, cfg.seed_width, similarity, dedup, _source_key(graph, source_of)
+        contacts, cfg.seed_width, similarity, dedup, source_key
     )
+    contact_supporters = _contact_supporters(contact_suppressed, source_of, source_key)
     if not seeds:
         raise ValueError(
             "no seed contact with positive similarity - the query touches "
@@ -253,7 +263,8 @@ def retrieve(
         seeds=seeds,
         propagation=result,
         contact_suppressed=contact_suppressed,
-        contact_votes=_contact_votes(contact_suppressed, source_of),
+        contact_votes=votes_of(contact_supporters),
+        contact_supporters=contact_supporters,
         contact_tau=contact_tau,
         dedup_mode=_dedup_mode(similarity, dedup),
     )
@@ -415,7 +426,8 @@ def _select_contacts(
     """Fill the seed slots with the first DISTINCT positive contacts.
 
     The elastic refill (2026-08-14 A1 decision): a contact that duplicates an
-    already selected one is skipped - it becomes a vote, and its slot goes to
+    already selected one is skipped - it becomes a vote unless it shares the
+    survivor's source, and its slot goes to
     the next distinct contact, so a duplicated corpus cannot halve the number
     of ideas the web starts from. With dedup off (or with neither refill rule
     live) this reduces exactly to "top `width` positive contacts". The adaptive
@@ -428,8 +440,10 @@ def _select_contacts(
     cosine structurally cannot: two propositions of the same passage are
     different sentences, so they are never near-duplicates, yet a query part
     that seeds both explores one passage instead of two. Both tests end in the
-    same place - skipped, voted, slot refilled - because they are the same
-    rule about the same damage.
+    same place - skipped, slot refilled - because they are the same rule
+    about the same damage. Whether the skip VOTES is `_contact_supporters`'s call:
+    a cosine twin from another source does, a passage's own second sentence
+    does not.
     """
     positive = [(node, score) for node, score in contacts if score > 0.0]
     if dedup is None or not dedup.enabled:
@@ -466,16 +480,26 @@ def _select_contacts(
     return kept, suppressed, tau
 
 
-def _contact_votes(
+def _contact_supporters(
     suppressed: Mapping[str, str],
     source_of: Mapping[str, str] | None,
-) -> dict[str, int]:
-    """Vote increments earned at contact selection, keyed like core votes."""
-    votes: dict[str, int] = {}
-    for survivor in suppressed.values():
+    source_key: SourceKeyFn,
+) -> dict[str, frozenset[str]]:
+    """Supporting sources found at contact selection, keyed like core votes.
+
+    The `record_support` rule, with "source" judged by `source_key`, which
+    knows the graph's sources even without a mapping: the distinct-source
+    refill skips on exactly that test, so every one of its skips is a passage
+    restating itself and supports nothing.
+    """
+    supporters: dict[str, set[str]] = {}
+    for candidate, survivor in suppressed.items():
+        supporter = source_key(candidate)
+        if supporter == source_key(survivor):
+            continue
         key = source_of.get(survivor, survivor) if source_of else survivor
-        votes[key] = votes.get(key, 1) + 1
-    return votes
+        supporters.setdefault(key, set()).add(supporter)
+    return merge_support(supporters)
 
 
 def _absorbing_field(
@@ -524,6 +548,8 @@ class ColoredRetrievalResult:
     duplicated (the elastic refill's ledger; empty while dedup is off)."""
     contact_votes: Mapping[str, int] = field(default_factory=dict)
     """Votes earned at contact selection across all colours."""
+    contact_supporters: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    """The sources behind `contact_votes`, unioned across colours."""
     contact_taus: Mapping[str, float] = field(default_factory=dict)
     """Per colour: the adaptive cut used at contact selection."""
     dedup_mode: str = "off"
@@ -535,10 +561,9 @@ class ColoredRetrievalResult:
 
     def votes(self) -> dict[str, int]:
         """Corpus support per idea, merged across BOTH suppression stages."""
-        merged = dict(self.colored.votes())
-        for key, count in self.contact_votes.items():
-            merged[key] = merged.get(key, 1) + (count - 1)
-        return merged
+        return votes_of(
+            merge_support(self.colored.supporters(), self.contact_supporters)
+        )
 
     @property
     def bridges(self) -> Mapping[str, tuple[str, ...]]:
@@ -638,7 +663,7 @@ def retrieve_colored(
     seeds_by_color: dict[str, dict[str, float]] = {}
     contact_suppressed: dict[str, dict[str, str]] = {}
     contact_taus: dict[str, float] = {}
-    contact_votes: dict[str, int] = {}
+    contact_support: list[dict[str, frozenset[str]]] = []
     for position, (color, embedding) in enumerate(colored_queries.items()):
         contacts = index.search(embedding, depth)
         # Per COLOUR, deliberately: two colours touching one passage is a
@@ -659,8 +684,9 @@ def retrieve_colored(
         seeds_by_color[color] = seeds
         if suppressed_here:
             contact_suppressed[color] = suppressed_here
-            for key, count in _contact_votes(suppressed_here, source_of).items():
-                contact_votes[key] = contact_votes.get(key, 1) + (count - 1)
+            contact_support.append(
+                _contact_supporters(suppressed_here, source_of, source_key)
+            )
         if tau_here is not None:
             contact_taus[color] = tau_here
 
@@ -689,11 +715,13 @@ def retrieve_colored(
         negative_seed=negative_cfg,
         polarity=polarity,
     )
+    contact_supporters = merge_support(*contact_support)
     return ColoredRetrievalResult(
         seeds_by_color=seeds_by_color,
         colored=result,
         contact_suppressed=contact_suppressed,
-        contact_votes=contact_votes,
+        contact_votes=votes_of(contact_supporters),
+        contact_supporters=contact_supporters,
         contact_taus=contact_taus,
         dedup_mode=_dedup_mode(similarity, dedup),
     )

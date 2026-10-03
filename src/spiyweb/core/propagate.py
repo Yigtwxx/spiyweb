@@ -25,7 +25,14 @@ from spiyweb.config import (
     PropagationConfig,
 )
 from spiyweb.core.conflict import ConflictRecord, neutralize
-from spiyweb.core.dedup import SimilarityFn, adaptive_threshold, find_survivor
+from spiyweb.core.dedup import (
+    SimilarityFn,
+    adaptive_threshold,
+    find_survivor,
+    merge_support,
+    record_support,
+    votes_of,
+)
 from spiyweb.core.graph import Graph
 from spiyweb.core.mass import node_masses
 from spiyweb.core.negative import AbsorptionRecord
@@ -54,9 +61,9 @@ class PropagationResult:
     Attributes:
         votes: Corpus support per surviving idea, keyed by the vote key the
             caller chose (`source_of`, or the surviving node id itself). A
-            value of `n` means the idea plus `n - 1` suppressed duplicates;
-            ideas that never absorbed a duplicate carry an implicit 1 and are
-            not listed.
+            value of `n` means the idea plus `n - 1` OTHER sources found
+            restating it - distinct sources, not suppressed copies; ideas
+            nobody supported carry an implicit 1 and are not listed.
         suppressed: Suppressed duplicate node -> the active node it
             duplicated. Suppressed nodes never activate and never receive
             energy; their edge shares were renormalised over the survivors.
@@ -73,6 +80,10 @@ class PropagationResult:
     hops_used: int
     stop_reason: StopReason
     votes: Mapping[str, int] = field(default_factory=dict)
+    supporters: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    """Vote key -> the OTHER sources found restating that idea; `votes` is
+    one plus the size of each set. Kept because merging two runs' votes
+    (stages, colours) must union these, never add counts."""
     suppressed: Mapping[str, str] = field(default_factory=dict)
     dedup_thresholds: tuple[float, ...] = ()
     conflicts: tuple[ConflictRecord, ...] = ()
@@ -135,8 +146,9 @@ def propagate(
         dedup: Dedup settings; only consulted when `similarity` is given.
             `None` or `enabled=False` disables the mechanism.
         source_of: Node id -> document/source id, for vote granularity. Votes
-            count corpus support per SOURCE, never per chunk; without the
-            mapping the surviving node id itself is the vote key.
+            count corpus support per SOURCE, never per chunk: one vote per
+            other source restating an idea, none for the idea's own source.
+            Without the mapping every node is its own source.
         negative: Symmetric node -> {opponent: strength} contradiction view
             (`conflict_adjacency` builds it from `NegativeEdge`s). Pre-marked
             at index time; this module never detects contradictions itself.
@@ -198,12 +210,12 @@ def propagate(
     contributors: defaultdict[str, list[str]] = defaultdict(list)
     activations: dict[str, Activation] = {}
     suppressed: dict[str, str] = {}
-    votes: dict[str, int] = {}
+    supporters: dict[str, set[str]] = {}
     taus: list[float] = []
     if dedup_on and dedup is not None and dedup.include_seeds and len(seeds) > 1:
         assert similarity is not None
         seeds, seed_tau = _dedup_seeds(
-            seeds, similarity, dedup, source_of, suppressed, votes
+            seeds, similarity, dedup, source_of, suppressed, supporters
         )
         taus.append(seed_tau)
     frontier = _inject(seeds, config.seed_energy)
@@ -314,8 +326,7 @@ def propagate(
                     _cleared.add(candidate)
                     return False
                 suppressed[candidate] = survivor
-                key = source_of.get(survivor, survivor) if source_of else survivor
-                votes[key] = votes.get(key, 1) + 1
+                record_support(supporters, candidate, survivor, source_of)
                 return True
 
         arrivals = _distribute(
@@ -345,7 +356,8 @@ def propagate(
         threshold=threshold,
         hops_used=hops_used,
         stop_reason=stop_reason,
-        votes=votes,
+        votes=votes_of(supporters),
+        supporters=merge_support(supporters),
         suppressed=suppressed,
         dedup_thresholds=tuple(taus),
         conflicts=tuple(conflicts),
@@ -360,7 +372,7 @@ def _dedup_seeds(
     dedup: DedupConfig,
     source_of: Mapping[str, str] | None,
     suppressed: dict[str, str],
-    votes: dict[str, int],
+    supporters: dict[str, set[str]],
 ) -> tuple[dict[str, float], float]:
     """Suppress near-duplicate SEEDS before injection (`include_seeds`).
 
@@ -382,8 +394,7 @@ def _dedup_seeds(
             kept.append(candidate)
             continue
         suppressed[candidate] = survivor
-        key = source_of.get(survivor, survivor) if source_of else survivor
-        votes[key] = votes.get(key, 1) + 1
+        record_support(supporters, candidate, survivor, source_of)
     return {node: seeds[node] for node in kept}, tau
 
 

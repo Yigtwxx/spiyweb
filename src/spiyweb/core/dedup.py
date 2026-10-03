@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Protocol
 from spiyweb.config import DedupConfig
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Collection, Mapping, Sequence
 
 
 class SimilarityFn(Protocol):
@@ -78,3 +78,52 @@ def find_survivor(
         if best is None or value > best[0] or (value == best[0] and node < best[1]):
             best = (value, node)
     return best[1] if best is not None else None
+
+
+def record_support(
+    supporters: dict[str, set[str]],
+    candidate: str,
+    survivor: str,
+    source_of: Mapping[str, str] | None,
+) -> None:
+    """Note that `candidate`'s source supports the idea `survivor` carries.
+
+    Votes count corpus support per SOURCE: an idea's vote is one plus the
+    number of OTHER sources found restating it, however many copies each
+    holds and at however many stages they were suppressed. A copy from the
+    survivor's own source is suppressed like any other - edge zeroed, share
+    redistributed - and supports nothing: a document restating itself is not
+    a second document agreeing. Both cases are the norm on a two-layer index,
+    where a passage's propositions restate it and each other. Without a
+    source mapping every node stands for itself, so every copy is a source.
+    """
+    if source_of is None:
+        key, supporter = survivor, candidate
+    else:
+        key = source_of.get(survivor, survivor)
+        supporter = source_of.get(candidate, candidate)
+    if supporter != key:
+        supporters.setdefault(key, set()).add(supporter)
+
+
+def merge_support(
+    *ledgers: Mapping[str, Collection[str]],
+) -> dict[str, frozenset[str]]:
+    """Union supporter sets across stages or colours, key by key.
+
+    The union, never a sum: one source found at contact selection and again
+    in the web is still one source.
+    """
+    merged: dict[str, set[str]] = {}
+    for ledger in ledgers:
+        for key, sources in ledger.items():
+            merged.setdefault(key, set()).update(sources)
+    return {key: frozenset(sources) for key, sources in merged.items() if sources}
+
+
+def votes_of(supporters: Mapping[str, Collection[str]]) -> dict[str, int]:
+    """Votes from a support ledger: the idea itself plus each other source.
+
+    Ideas nobody supported carry an implicit 1 and are not listed.
+    """
+    return {key: 1 + len(sources) for key, sources in supporters.items() if sources}
