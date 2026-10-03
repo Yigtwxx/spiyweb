@@ -243,6 +243,48 @@ the mechanism needs a config AND a similarity backend, and this project's own
 measurement campaign ran with it silently off for want of the second half.
 `answer.dedup_mode` is the receipt.
 
+### Keeping an index up to date
+
+When the corpus changes, sync instead of rebuilding. Pass the whole current
+corpus; only new or edited chunks are embedded and extracted again, removed
+ones are dropped, and the result is artifact-for-artifact the index a fresh
+`build_index` would write:
+
+```python
+from spiyweb.indexing import sync_index
+
+report = sync_index(
+    docs,
+    "data/mydocs",
+    embedder=SentenceTransformerEmbedder(),
+    entity_pipeline=load_spacy_pipeline(),
+)
+print(report.reused, report.added, report.changed, report.removed)
+```
+
+`spiyweb index <docs> <out>` does the same when `<out>` already holds an
+index; `--force` rebuilds from scratch. A different embedding model is
+refused rather than mixed into the old vectors.
+
+### Inside LangChain or LlamaIndex
+
+```bash
+pip install "spiyweb[langchain]"    # or "spiyweb[llamaindex]"
+```
+
+```python
+from spiyweb.integrations.langchain import SpiywebRetriever
+
+retriever = SpiywebRetriever(index=spiyweb.open_index("data/mydocs"))
+docs = retriever.invoke("who signed off on the change?")
+# docs[0].metadata -> node_id, source_id, energy, votes, hop, ...
+```
+
+`spiyweb.integrations.llamaindex.SpiywebLlamaRetriever` returns
+`NodeWithScore`s scored by energy. Both keep the web's own order and have no
+`k` by default (`max_documents` / `max_nodes` cap the list after the
+ranking); `import spiyweb` never imports either framework.
+
 ## Public API
 
 `import spiyweb` is the query-time contract: everything in `spiyweb.__all__`

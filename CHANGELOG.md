@@ -41,6 +41,13 @@ regression suite, and its CLI flags are not covered by the policy above.
   built by 0.2.4 from the same corpus; `max_df_cap=None` restores the old
   layer.
 
+### Fixed
+
+- Rerunning `spiyweb index <docs> <out>` on an existing index silently left
+  out new and edited files: every stage skipped itself because its artifact
+  existed. The command now syncs (`sync_index`) and rebuilds from scratch
+  only with `--force`; the monitor's `/index` runs the same command.
+
 ### Added
 
 - `ColoredRetrievalConfig.question_color_width` (default `0`, off) and a

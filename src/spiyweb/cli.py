@@ -204,7 +204,7 @@ def _index(args: argparse.Namespace) -> int:
     try:
         from spiyweb.embedding import SentenceTransformerEmbedder
         from spiyweb.entities import load_spacy_pipeline
-        from spiyweb.indexing import build_index
+        from spiyweb.indexing import build_index, sync_index
         from spiyweb.llm import LLMError
     except ImportError as missing:
         raise Problem(
@@ -238,21 +238,30 @@ def _index(args: argparse.Namespace) -> int:
         pipeline = load_spacy_pipeline()
     except OSError as absent:
         raise Problem(str(absent)) from absent
+    common: dict[str, object] = {
+        "embedder": embedder,
+        "entity_pipeline": pipeline,
+        "llm": llm,
+        "llm_model": llm_model,
+        # The flag adds ONE thing. The LLM entity fallback is a separate
+        # ablation with its own cost, and this verb has never run it.
+        "entity_llm": False,
+        "propositions": args.propositions,
+        "embedding_model": getattr(embedder, "model_name", None),
+    }
     try:
-        manifest = build_index(
-            documents,
-            args.out,
-            embedder=embedder,
-            entity_pipeline=pipeline,
-            llm=llm,
-            llm_model=llm_model,
-            # The flag adds ONE thing. The LLM entity fallback is a separate
-            # ablation with its own cost, and this verb has never run it.
-            entity_llm=False,
-            propositions=args.propositions,
-            embedding_model=getattr(embedder, "model_name", None),
-            force=args.force,
-        )
+        if args.force:
+            manifest = build_index(documents, args.out, force=True, **common)  # type: ignore[arg-type]
+        else:
+            # Rerunning on a changed folder used to resume - every stage
+            # skipped itself because its file existed, so new and edited
+            # documents were silently left out. Syncing pays only for what
+            # changed and leaves exactly the index a fresh build would.
+            manifest = sync_index(documents, args.out, **common).manifest  # type: ignore[arg-type]
+    except ValueError as refused:
+        raise Problem(
+            f"{refused}\nrerun with --force to rebuild the index"
+        ) from refused
     except LLMError as failed:
         raise Problem(
             f"{failed}\nproposition extraction needs a reachable LLM - with the "
@@ -579,7 +588,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="one unit per file instead of one per blank-line-separated block",
     )
     index.add_argument(
-        "--force", action="store_true", help="rebuild artifacts that already exist"
+        "--force",
+        action="store_true",
+        help="rebuild everything from scratch; without it an existing index "
+        "is synced - only new or changed files are embedded again",
     )
     index.add_argument(
         "--propositions",

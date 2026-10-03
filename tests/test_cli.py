@@ -475,3 +475,23 @@ def test_an_unreachable_llm_names_the_fix(
     argv = ["index", str(_corpus(tmp_path)), str(tmp_path / "idx"), "--propositions"]
     with pytest.raises(Problem, match=r"ollama pull llama3\.1:8b"):
         main(argv)
+
+
+def test_rerunning_index_syncs_new_and_changed_files(
+    tmp_path: Path, index_stubs: type[_ScriptedClient]
+) -> None:
+    from spiyweb.indexing import load_texts, read_manifest
+
+    docs, out = _corpus(tmp_path), tmp_path / "idx"
+    assert main(["index", str(docs), str(out)]) == 0
+    assert read_manifest(out).chunks == 3
+
+    (docs / "c.txt").write_text("Morgan stopped funding the tower.\n")
+    (docs / "b.md").write_text("Wardenclyffe stood on Long Island, New York.\n")
+    assert main(["index", str(docs), str(out)]) == 0
+
+    texts = load_texts(out)
+    assert read_manifest(out).chunks == 4, "the new file was indexed, not skipped"
+    assert "Wardenclyffe stood on Long Island, New York." in texts.values(), (
+        "an edited file is re-indexed, not served from the old artifact"
+    )
