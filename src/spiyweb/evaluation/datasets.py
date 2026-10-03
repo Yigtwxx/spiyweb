@@ -67,6 +67,9 @@ class MusiqueQuestion:
         bridge_gold_ids: Corpus chunk ids supporting every decomposition step
             EXCEPT the last - the intermediate documents the multi-hop claim
             is actually about.
+        answer_aliases: Other accepted spellings of the answer (MuSiQue ships
+            them; HotpotQA and 2Wiki do not). Read only by the answer-quality
+            reader, which scores a reply against the answer and every alias.
     """
 
     id: str
@@ -75,6 +78,7 @@ class MusiqueQuestion:
     hops: int
     gold_ids: tuple[str, ...]
     bridge_gold_ids: tuple[str, ...]
+    answer_aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -227,6 +231,9 @@ def load_dataset(path: Path, config: EvaluationConfig | None = None) -> MusiqueD
                 id=question_id,
                 question=str(record["question"]),
                 answer=str(record["answer"]),
+                answer_aliases=tuple(
+                    str(alias) for alias in record.get("answer_aliases") or ()
+                ),
                 hops=_parse_hops(question_id),
                 gold_ids=gold_ids,
                 bridge_gold_ids=tuple(bridge_ids),

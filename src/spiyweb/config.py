@@ -1330,6 +1330,41 @@ class IterativeBaselineConfig:
 
 
 @dataclass(frozen=True)
+class ReaderConfig:
+    """Settings of the answer-quality reader (evaluation only, never core/).
+
+    Retrieval recall says whether the right passages came back; a framework
+    user sees the ANSWER. The reader puts each system's top-`k` passages in
+    front of one fixed LLM with one fixed prompt, so the only thing that
+    differs between the systems' EM/F1 is the context they retrieved.
+
+    Attributes:
+        k: Passages handed to the reader, counted as distinct passages (a
+            proposition stands for its parent, as in every metric). 5 matches
+            the retrieval cutoff the gate is measured at.
+        max_answer_words: Cap on the parsed answer; gold answers in the three
+            benchmarks are short spans, and a rambling reply would only add
+            false tokens to F1.
+        systems: Which per-query ranking columns are read.
+        model: Reader model; `None` uses `LLMConfig`'s default, the same local
+            model the iterative baseline and the extraction calls use.
+    """
+
+    k: int = 5
+    max_answer_words: int = 12
+    systems: tuple[str, ...] = ("topk", "web", "iterative")
+    model: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.k < 1:
+            raise ValueError("k must be at least 1")
+        if self.max_answer_words < 1:
+            raise ValueError("max_answer_words must be at least 1")
+        if not self.systems:
+            raise ValueError("systems must not be empty")
+
+
+@dataclass(frozen=True)
 class EvaluationConfig:
     """Settings of the MuSiQue evaluation harness - the weighted objective's
     only home.

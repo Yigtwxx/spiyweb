@@ -772,7 +772,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="MuSiQue evaluation pipeline (Phase 1 measurement).",
     )
     parser.add_argument(
-        "stage", choices=["download", "index", "evaluate", "report", "all"]
+        "stage", choices=["download", "index", "evaluate", "report", "answer", "all"]
     )
     parser.add_argument("--data-dir", type=Path, default=Path("data/musique"))
     parser.add_argument(
@@ -1003,6 +1003,31 @@ def main(argv: Sequence[str] | None = None) -> int:
             dedup=DedupConfig() if args.dedup else None,
             distinct_passages=args.distinct_passages,
         )
+
+    if args.stage == "answer":
+        # Answer quality is its own stage, never part of "all": it reads a
+        # finished run's rankings and costs one reader call per system per
+        # question, so it only runs when someone asks for it.
+        from spiyweb.config import ReaderConfig
+        from spiyweb.evaluation.answer import answer_records, summarize_answers
+
+        reader_config = ReaderConfig()
+        with paths.per_query_jsonl.open(encoding="utf-8") as handle:
+            records = [json.loads(line) for line in handle]
+        rows = answer_records(
+            records,
+            loader(dataset_path, cfg),
+            _real_llm(paths, reader_config.model),
+            reader_config,
+        )
+        with paths.answers_jsonl.open("w", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        summary = summarize_answers(rows, reader_config)
+        paths.answer_results_json.write_text(
+            json.dumps(summary, indent=2), encoding="utf-8"
+        )
+        print(json.dumps(summary, indent=2))
 
     if args.stage in ("report", "all"):
         results = json.loads(paths.results_json.read_text(encoding="utf-8"))

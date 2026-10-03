@@ -97,6 +97,14 @@ class IndexPaths(IndexLayout):
     def per_query_jsonl(self) -> Path:
         return self.root / "per_query.jsonl"
 
+    @property
+    def answers_jsonl(self) -> Path:
+        return self.root / "answers.jsonl"
+
+    @property
+    def answer_results_json(self) -> Path:
+        return self.root / "answer_results.json"
+
 
 def composed_text(title: str, text: str) -> str:
     """The one string both the embedder and the extractor see for a passage.

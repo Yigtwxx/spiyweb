@@ -140,3 +140,15 @@ Retrieved paragraphs:
 Reasoning so far:
 {reasoning}
 """
+
+READER_PROMPT = """\
+Answer the question using the passages below. Reply with ONLY the answer -
+the exact name, date, number or short phrase, or "yes"/"no" - with no
+sentence and no explanation. If the passages do not contain the answer, give
+your single best guess.
+
+{passages}
+
+Question: {question}
+Answer:
+"""
