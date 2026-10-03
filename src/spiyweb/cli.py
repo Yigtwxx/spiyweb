@@ -30,12 +30,14 @@ from typing import TYPE_CHECKING
 
 from spiyweb import __version__
 from spiyweb.config import CorpusLintConfig as CorpusLintDefaults
+from spiyweb.config import LLMConfig
 from spiyweb.profiles import DEFAULT_PROFILE
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from spiyweb.indexing import DocumentInput
+    from spiyweb.llm import LLMClient
     from spiyweb.session import SpiywebIndex
 
 __all__ = ["main"]
@@ -76,6 +78,10 @@ LINT_WORST = 10
 DEFAULT_TOP = 10
 """Passages `query` prints. NOT a `top-k`: the web already stopped itself,
 and this only decides how much of its answer fits on a terminal screen."""
+
+_DEFAULT_LLM = LLMConfig()
+"""The provider `index --propositions` talks to when no `--llm-*` flag says
+otherwise; read here only so the help text names the real defaults."""
 
 EXTRAS = {
     "store": ("numpy", "faiss"),
@@ -199,35 +205,95 @@ def _index(args: argparse.Namespace) -> int:
         from spiyweb.embedding import SentenceTransformerEmbedder
         from spiyweb.entities import load_spacy_pipeline
         from spiyweb.indexing import build_index
+        from spiyweb.llm import LLMError
     except ImportError as missing:
         raise Problem(
             f"{missing}\nindexing needs the index-time extras: "
             'pip install "spiyweb[index]"'
         ) from missing
 
+    llm_flags = [
+        flag
+        for flag, value in (
+            ("--llm-model", args.llm_model),
+            ("--llm-url", args.llm_url),
+            ("--llm-key-env", args.llm_key_env),
+        )
+        if value is not None
+    ]
+    if llm_flags and not args.propositions:
+        # Accepting them silently would leave the user believing a model ran.
+        raise Problem(f"{', '.join(llm_flags)} only applies with --propositions")
+
     documents = _read_documents(args.docs, args.glob, args.whole_file)
     units = sum(len(document.units) for document in documents)
     print(f"{len(documents)} document(s), {units} unit(s) -> {args.out}")
 
+    llm, llm_model = _proposition_llm(args) if args.propositions else (None, None)
     embedder = SentenceTransformerEmbedder()
     try:
         pipeline = load_spacy_pipeline()
     except OSError as absent:
         raise Problem(str(absent)) from absent
-    manifest = build_index(
-        documents,
-        args.out,
-        embedder=embedder,
-        entity_pipeline=pipeline,
-        embedding_model=getattr(embedder, "model_name", None),
-        force=args.force,
-    )
+    try:
+        manifest = build_index(
+            documents,
+            args.out,
+            embedder=embedder,
+            entity_pipeline=pipeline,
+            llm=llm,
+            llm_model=llm_model,
+            # The flag adds ONE thing. The LLM entity fallback is a separate
+            # ablation with its own cost, and this verb has never run it.
+            entity_llm=False,
+            propositions=args.propositions,
+            embedding_model=getattr(embedder, "model_name", None),
+            force=args.force,
+        )
+    except LLMError as failed:
+        raise Problem(
+            f"{failed}\nproposition extraction needs a reachable LLM - with the "
+            f"default, `ollama serve` and `ollama pull {llm_model}`. Calls already "
+            "answered are cached; rerunning the same command resumes."
+        ) from failed
     print(
         f"done: {manifest.chunks} chunk(s), "
         f"{sum(manifest.edges.values())} edge(s) across "
         f"{len([n for n, c in manifest.edges.items() if c])} layer(s)"
     )
     return 0
+
+
+def _proposition_llm(args: argparse.Namespace) -> tuple[LLMClient, str]:
+    """The extraction client for `--propositions`, behind a per-model cache.
+
+    One call per unit is hours on a real corpus, and `build_index` writes the
+    proposition artifact only once every call has answered. The cache makes
+    an interrupted run resumable: the same command replays what was already
+    answered and asks only for the rest.
+    """
+    from dataclasses import replace
+
+    from spiyweb.evaluation.cache import CachedLLMClient
+    from spiyweb.indexing import IndexLayout
+    from spiyweb.llm import OpenAICompatClient
+
+    config = LLMConfig()
+    overrides = {
+        name: value
+        for name, value in (
+            ("model", args.llm_model),
+            ("base_url", args.llm_url),
+            ("api_key_env", args.llm_key_env),
+        )
+        if value is not None
+    }
+    try:
+        config = replace(config, **overrides)
+    except ValueError as invalid:
+        raise Problem(str(invalid)) from invalid
+    cache = IndexLayout.at(args.out).llm_cache_for(config.model)
+    return CachedLLMClient(OpenAICompatClient(config), cache), config.model
 
 
 # --- query -----------------------------------------------------------------
@@ -509,6 +575,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     index.add_argument(
         "--force", action="store_true", help="rebuild artifacts that already exist"
+    )
+    index.add_argument(
+        "--propositions",
+        action="store_true",
+        help="add the proposition layer: one LLM call per unit (local Ollama "
+        "by default). Slower to build, and measured to be what lets the web "
+        "beat plain top-k",
+    )
+    index.add_argument(
+        "--llm-model", help=f"model for --propositions (default {_DEFAULT_LLM.model})"
+    )
+    index.add_argument(
+        "--llm-url",
+        help=f"OpenAI-compatible API root (default {_DEFAULT_LLM.base_url})",
+    )
+    index.add_argument(
+        "--llm-key-env",
+        metavar="NAME",
+        help="environment variable holding the API key - the name, never the key",
     )
     index.set_defaults(handler=_index)
 

@@ -32,6 +32,7 @@ index work asks for `spiyweb[index]`.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -40,6 +41,7 @@ from spiyweb.config import (
     EdgeLayer,
     EntityEdgeConfig,
     EntityExtractionConfig,
+    LLMConfig,
     NLICandidateConfig,
     NLIEdgeConfig,
     PropositionConfig,
@@ -214,6 +216,18 @@ class IndexLayout:
     @property
     def llm_cache_jsonl(self) -> Path:
         return self.root / "llm_cache.jsonl"
+
+    def llm_cache_for(self, model: str | None) -> Path:
+        """The LLM cache file for `model` - one file per model.
+
+        The cache key is the prompt alone, by design, so two models sharing a
+        file would silently answer for each other. The default model keeps the
+        historical `llm_cache.jsonl`; any other gets its own tagged file.
+        """
+        if model is None or model == LLMConfig().model:
+            return self.llm_cache_jsonl
+        tag = re.sub(r"[^A-Za-z0-9._-]", "-", model)
+        return self.root / f"llm_cache_{tag}.jsonl"
 
 
 @dataclass(frozen=True)

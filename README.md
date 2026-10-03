@@ -53,7 +53,7 @@ Building an index needs the index-time extras once:
 
 ```bash
 pip install "spiyweb[index]"
-python -m spacy download en_core_web_sm
+python -m spacy download xx_ent_wiki_sm
 ```
 
 or, inside the monitor, `/install index`. `pip install spiyweb` on its own
@@ -111,12 +111,24 @@ The same verbs work without the screen, for scripts and pipes:
 
 ```bash
 pip install "spiyweb[index]"
-python -m spacy download en_core_web_sm
+python -m spacy download xx_ent_wiki_sm
 
 spiyweb index docs/ my-index          # a directory of .txt/.md -> an index
 spiyweb query my-index "what happened afterwards"
 spiyweb lint my-index                 # what is wrong with the CORPUS
 ```
+
+`spiyweb index docs/ my-index --propositions` adds the second node layer:
+a local LLM (Ollama, `llama3.1:8b` by default) splits every passage into
+short, self-contained facts, and those join the graph beside the passages.
+It costs one LLM call per passage - about three seconds each on a laptop
+GPU - and it is the measured difference that matters: on MuSiQue the web
+over a passage-only graph beat plain `top-k` by **+.005** (inside the
+noise), and over the same corpus with propositions by **+.047**, CI
+[+.029, +.067]. An interrupted run resumes where it stopped; `--llm-model`,
+`--llm-url` and `--llm-key-env` point it at another model or any
+OpenAI-compatible API, the last one naming the environment variable that
+holds the key rather than the key.
 
 `lint` is the diagnostic that needs no query: it reads the graph's shape and
 reports islands nothing bridges, hubs that grind arriving energy into dust,

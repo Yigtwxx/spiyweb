@@ -43,11 +43,14 @@ export function highlightPython(code: string): string {
     return out + escape(code.slice(last));
 }
 
-/* Shell lines: the command name and its flags. */
+/* Shell lines: the command name and its flags; comments and blanks pass. */
 export function highlightShell(code: string): string {
     return code
         .split('\n')
         .map((line) => {
+            // A blank line separates; a comment explains. Neither is typed.
+            if (line.trim() === '') return '';
+            if (line.startsWith('#')) return `<span class="hl-c">${escape(line)}</span>`;
             const [cmd = '', ...rest] = line.split(' ');
             const tail = rest
                 .map((w) =>

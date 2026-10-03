@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
@@ -728,14 +727,8 @@ def _real_embedder(device: str | None) -> Embedder:
 
 
 def _llm_cache_path(paths: IndexPaths, model: str | None) -> Path:
-    """Model-specific cache file - the cache key is prompt-only by design,
-    so two models sharing one file would silently answer for each other."""
-    from spiyweb.config import LLMConfig
-
-    if model is None or model == LLMConfig().model:
-        return paths.llm_cache_jsonl
-    tag = re.sub(r"[^A-Za-z0-9._-]", "-", model)
-    return paths.root / f"llm_cache_{tag}.jsonl"
+    """Model-specific cache file; the rule lives on the layout."""
+    return paths.llm_cache_for(model)
 
 
 def _real_llm(

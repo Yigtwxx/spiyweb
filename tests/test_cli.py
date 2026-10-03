@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
@@ -342,3 +342,136 @@ def test_an_explicit_profile_still_wins(
         main(["query", str(tiny_index_root), "a question", "--profile", "precise"]) == 0
     )
     assert asked == ["precise"]
+
+
+# --- index --propositions ----------------------------------------------------
+
+
+class _LengthEmbedder:
+    """Any text gets a vector; proposition strings are not known in advance."""
+
+    model_name = "fake-e5"
+
+    def embed_passages(self, texts: list[str]) -> list[list[float]]:
+        return [[1.0, float(len(text) % 7), float(len(text) % 3)] for text in texts]
+
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_passages(texts)
+
+
+class _NoEntities:
+    def pipe(self, texts: list[str]) -> list[object]:
+        class Doc:
+            ents: tuple[object, ...] = ()
+
+        return [Doc() for _ in texts]
+
+
+class _ScriptedClient:
+    """Stands in for `OpenAICompatClient`: one fact back per call, all logged."""
+
+    calls: ClassVar[list[str]] = []
+    models: ClassVar[list[str]] = []
+
+    def __init__(self, config: object) -> None:
+        type(self).models.append(config.model)  # type: ignore[attr-defined]
+
+    def complete(self, prompt: str) -> str:
+        type(self).calls.append(prompt)
+        return f"Fact number {len(type(self).calls)} holds."
+
+
+@pytest.fixture
+def index_stubs(monkeypatch: pytest.MonkeyPatch) -> type[_ScriptedClient]:
+    """The three heavy objects `index` builds, swapped for fakes."""
+    _ScriptedClient.calls = []
+    _ScriptedClient.models = []
+    monkeypatch.setattr(
+        "spiyweb.embedding.SentenceTransformerEmbedder", _LengthEmbedder
+    )
+    monkeypatch.setattr("spiyweb.entities.load_spacy_pipeline", _NoEntities)
+    monkeypatch.setattr("spiyweb.llm.OpenAICompatClient", _ScriptedClient)
+    return _ScriptedClient
+
+
+def _corpus(root: Path) -> Path:
+    docs = root / "docs"
+    docs.mkdir()
+    (docs / "a.txt").write_text("Tesla built a tower.\n\nIt was torn down.\n")
+    (docs / "b.md").write_text("Wardenclyffe stood on Long Island.\n")
+    return docs
+
+
+def test_index_propositions_adds_the_layer_through_the_default_llm(
+    tmp_path: Path, index_stubs: type[_ScriptedClient]
+) -> None:
+    from spiyweb.config import LLMConfig
+    from spiyweb.indexing import IndexLayout, read_manifest
+
+    out = tmp_path / "idx"
+    assert main(["index", str(_corpus(tmp_path)), str(out), "--propositions"]) == 0
+
+    assert len(index_stubs.calls) == 3, "one call per unit, entity fallback off"
+    assert index_stubs.models == [LLMConfig().model]
+    assert read_manifest(out).propositions == 3
+    cache = IndexLayout.at(out).llm_cache_jsonl
+    assert len(cache.read_text(encoding="utf-8").splitlines()) == 3
+
+
+def test_an_interrupted_extraction_resumes_from_the_cache(
+    tmp_path: Path, index_stubs: type[_ScriptedClient]
+) -> None:
+    docs, out = _corpus(tmp_path), tmp_path / "idx"
+    assert main(["index", str(docs), str(out), "--propositions"]) == 0
+    index_stubs.calls.clear()
+
+    # --force rebuilds every artifact, so only the cache can spare the calls.
+    assert main(["index", str(docs), str(out), "--propositions", "--force"]) == 0
+    assert index_stubs.calls == []
+
+
+def test_a_plain_index_never_builds_an_llm(
+    tmp_path: Path, index_stubs: type[_ScriptedClient]
+) -> None:
+    from spiyweb.indexing import read_manifest
+
+    out = tmp_path / "idx"
+    assert main(["index", str(_corpus(tmp_path)), str(out)]) == 0
+    assert index_stubs.models == []
+    assert read_manifest(out).propositions == 0
+
+
+def test_another_model_gets_its_own_cache(
+    tmp_path: Path, index_stubs: type[_ScriptedClient]
+) -> None:
+    out = tmp_path / "idx"
+    argv = ["index", str(_corpus(tmp_path)), str(out), "--propositions"]
+    assert main([*argv, "--llm-model", "qwen2.5:7b"]) == 0
+    assert index_stubs.models == ["qwen2.5:7b"]
+    assert (out / "llm_cache_qwen2.5-7b.jsonl").exists()
+    assert not (out / "llm_cache.jsonl").exists()
+
+
+def test_llm_flags_without_propositions_are_refused(
+    tmp_path: Path, index_stubs: type[_ScriptedClient]
+) -> None:
+    argv = ["index", str(_corpus(tmp_path)), str(tmp_path / "idx")]
+    with pytest.raises(Problem, match="--llm-model only applies with --propositions"):
+        main([*argv, "--llm-model", "qwen2.5:7b"])
+    assert not (tmp_path / "idx").exists(), "refused before any work"
+
+
+def test_an_unreachable_llm_names_the_fix(
+    tmp_path: Path,
+    index_stubs: type[_ScriptedClient],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from spiyweb.llm import LLMError
+
+    def refuse(self: _ScriptedClient, prompt: str) -> str:
+        raise LLMError("connection refused")
+
+    monkeypatch.setattr(_ScriptedClient, "complete", refuse)
+    argv = ["index", str(_corpus(tmp_path)), str(tmp_path / "idx"), "--propositions"]
+    with pytest.raises(Problem, match=r"ollama pull llama3\.1:8b"):
+        main(argv)

@@ -13,8 +13,12 @@ export const install: readonly { label: string; cmd: string }[] = [
 /* The same verbs without the screen, for scripts and pipes. */
 export const cliCommands: readonly Command[] = [
     { cmd: 'pip install "spiyweb[index]"', comment: 'the index-time extras, once' },
-    { cmd: 'python -m spacy download en_core_web_sm', comment: 'the entity model' },
+    { cmd: 'python -m spacy download xx_ent_wiki_sm', comment: 'the entity model' },
     { cmd: 'spiyweb index docs/ my-index', comment: 'a directory of .txt/.md → an index' },
+    {
+        cmd: 'spiyweb index docs/ my-index --propositions',
+        comment: 'sharper: a local LLM splits passages into facts',
+    },
     {
         cmd: 'spiyweb query my-index "what happened afterwards"',
         comment: 'what lit up, as bars',
@@ -66,9 +70,12 @@ export const siblings: readonly { name: string; href: string; tag: string }[] = 
 /* Using it as a library: three steps from a folder of documents to context for
    whichever model the caller already uses. No index of your own needed. */
 export const libraryInstall = `pip install "spiyweb[index]"
-python -m spacy download en_core_web_sm`;
+python -m spacy download xx_ent_wiki_sm`;
 
-export const libraryIndex = `spiyweb index docs/ my-index`;
+export const libraryIndex = `spiyweb index docs/ my-index
+
+# sharper, with Ollama running: passages split into facts
+spiyweb index docs/ my-index --propositions`;
 
 export const librarySnippet = `import spiyweb
 

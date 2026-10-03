@@ -27,7 +27,24 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `spiyweb index --propositions` builds the proposition layer from the
+  command line - one call per passage to a local Ollama model by default,
+  `--llm-model` / `--llm-url` / `--llm-key-env` for anything
+  OpenAI-compatible. The library has had the layer since Phase 1; the
+  command did not, so everyone indexing from the terminal got a
+  passage-only graph, where the web's measured lead over `top-k` is +.005
+  and not significant (+.047 with the layer). Calls are cached per model in
+  the index directory, so rerunning an interrupted build resumes it. The
+  LLM entity fallback stays off: the flag adds one thing.
+
+### Fixed
+
+- The README and the landing page told newcomers to download
+  `en_core_web_sm`; the entity extractor loads the multilingual
+  `xx_ent_wiki_sm`, so following the instructions ended at "spaCy model
+  'xx_ent_wiki_sm' is not installed" on the first `spiyweb index`.
 
 ## [0.2.2] - 2026-10-03
 
