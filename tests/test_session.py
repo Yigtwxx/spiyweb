@@ -297,32 +297,3 @@ def test_a_named_profile_wins_over_any_config(tmp_path: Path) -> None:
     assert answer.config is not None
     assert answer.config.propagation.damping == PRECISE.damping
     assert answer.config.contact_overfetch == 7, "only the three knobs move"
-
-
-def test_the_question_colour_gets_its_own_vector_and_is_recorded(
-    tmp_path: Path,
-) -> None:
-    from spiyweb import ColoredRetrievalConfig
-
-    _build(tmp_path)
-    parts = {"c0": "who raised the tower"}
-    config = ColoredRetrievalConfig(question_color_width=1)
-    with open_index(tmp_path, embedder=FakeEmbedder()) as index:
-        with_question = index.retrieve_colored(
-            parts, config=config, question="what happened afterwards"
-        )
-        question_alone = index.retrieve_colored(
-            {"c0": "what happened afterwards"},
-            config=ColoredRetrievalConfig(seed_width=1),
-        )
-        plain = index.retrieve_colored(parts)
-
-    seeds = with_question.result.seeds_by_color
-    assert seeds["c0"] == plain.result.seeds_by_color["c0"], (
-        "the part keeps its own vector - the question is split off the batch"
-    )
-    assert seeds["question"] == question_alone.result.seeds_by_color["c0"], (
-        "the question colour is seeded from the question's own vector"
-    )
-    assert with_question.trace.settings["question_color_width"] == 1
-    assert plain.trace.settings["question_color_width"] == 0

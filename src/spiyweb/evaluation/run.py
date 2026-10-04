@@ -59,7 +59,7 @@ from spiyweb.evaluation.metrics import (
     support_recall_at_k,
     weighted_objective,
 )
-from spiyweb.retrieve import QUESTION_COLOR, _dedup_mode, retrieve, retrieve_colored
+from spiyweb.retrieve import _dedup_mode, retrieve, retrieve_colored
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -209,10 +209,6 @@ def evaluate_questions(
             conflict=conflict if negative is not None else None,
             similarity=similarity,
             dedup=dedup,
-            question_vectors={
-                question.id: vector
-                for question, vector in zip(questions, question_vectors, strict=True)
-            },
             log=log,
         )
     else:
@@ -337,7 +333,6 @@ def _run_colored_web(
     dedup: DedupConfig | None = None,
     on_result: Callable[[str, ColoredRetrievalResult], None] | None = None,
     profile_for: Callable[[int], ColoredRetrievalConfig] | None = None,
-    question_vectors: Mapping[str, Sequence[float]] | None = None,
     log: Callable[[str], None],
 ) -> int:
     """The coloured pipeline, phase by phase (decompose -> embed -> chain ->
@@ -354,11 +349,7 @@ def _run_colored_web(
     chosen automatically instead of by the caller). It is consulted only for
     the propagation call - decomposition and intermediate-answer extraction
     keep using `config`, so every LLM prompt stays byte-identical and the
-    profile is the single thing that varies.
-
-    `question_vectors` (question id -> the undivided question's embedding)
-    feeds the question colour; it is only read when
-    `config.question_color_width` is positive."""
+    profile is the single thing that varies."""
     vector_of: dict[str, list[float]] = {}
 
     def embed_unique(texts: list[str]) -> None:
@@ -474,11 +465,6 @@ def _run_colored_web(
             dedup=dedup,
             negative=negative,
             conflict=conflict,
-            question=(
-                question_vectors[question.id]
-                if question_vectors is not None and active.question_color_width
-                else None
-            ),
         )
         # Measurement seam: an ablation that needs the ENERGIES (not just the
         # order) must see the shipped pipeline's own result, never a
@@ -503,11 +489,7 @@ def _run_colored_web(
             "seeds": {
                 color: dict(seeds) for color, seeds in result.seeds_by_color.items()
             },
-            # Query PARTS only: the question colour is not a decomposition
-            # result, and counting it would shift every colour histogram.
-            "n_colors": sum(
-                1 for color in result.seeds_by_color if color != QUESTION_COLOR
-            ),
+            "n_colors": len(result.seeds_by_color),
             "n_bridges": len(result.bridges),
             "bridge_hit": any(node in question.gold_ids for node in result.bridges),
             "subqueries": list(subqueries[question.id]),
@@ -535,7 +517,6 @@ def _colored_receipt(config: ColoredRetrievalConfig) -> dict[str, object]:
         "split_alpha": config.propagation.split_alpha,
         "max_colors": config.max_colors,
         "max_answer_words": config.max_answer_words,
-        "question_color_width": config.question_color_width,
     }
 
 
@@ -866,13 +847,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="intermediate-answer chaining: sequential (tour-12 winner), "
         "single (tour-9 ablation) or none (decomposition only)",
     )
-    parser.add_argument(
-        "--question-color-width",
-        type=int,
-        default=None,
-        help="seed the undivided question as one more colour with this many "
-        "contacts (gate round #6); 0 = off, the default",
-    )
     args = parser.parse_args(argv)
 
     colored_defaults = ColoredRetrievalConfig()
@@ -891,11 +865,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.decomp_model
             if args.decomp_model is not None
             else colored_defaults.decomposition_model
-        ),
-        question_color_width=(
-            args.question_color_width
-            if args.question_color_width is not None
-            else colored_defaults.question_color_width
         ),
     )
 

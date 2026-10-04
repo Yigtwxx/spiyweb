@@ -32,7 +32,7 @@ from spiyweb.core.dedup import merge_support, votes_of
 from spiyweb.core.propagate import PropagationResult, propagate
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Mapping
+    from collections.abc import Mapping
 
     from spiyweb.core.dedup import SimilarityFn
     from spiyweb.core.graph import Graph
@@ -99,7 +99,6 @@ def propagate_colored(
     absorb: Mapping[str, float] | None = None,
     negative_seed: NegativeSeedConfig | None = None,
     polarity: PolarityConfig | None = None,
-    context_colors: Collection[str] = (),
 ) -> ColoredResult:
     """Spread one web per colour and report where the colours meet.
 
@@ -129,12 +128,6 @@ def propagate_colored(
             `propagate`; the corpus's negative atoms absorb every colour's
             energy alike - the "no" does not depend on which query part
             arrived.
-        context_colors: Colours that spread and add their energy like any
-            other but never count towards a bridge - the undivided question
-            seeded beside its own parts is one. A node such a colour shares
-            with ONE part is not where two parts meet; only the remaining
-            colours decide bridges. Labels absent from `colored_seeds` are
-            ignored.
 
     Returns:
         Per-colour results, bridge nodes, and the combined ranking.
@@ -171,8 +164,6 @@ def propagate_colored(
 
     reached_by: dict[str, list[str]] = {}
     for color, result in per_color.items():
-        if color in context_colors:
-            continue
         for node in result.activations:
             reached_by.setdefault(node, []).append(color)
     bridges = {

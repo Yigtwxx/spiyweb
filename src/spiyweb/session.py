@@ -413,7 +413,6 @@ class SpiywebIndex:
         *,
         profile: str | None = None,
         config: ColoredRetrievalConfig | None = None,
-        question: str | None = None,
     ) -> ColoredAnswer:
         """One coloured seed set per query part; a node two colours reach is a bridge.
 
@@ -426,20 +425,13 @@ class SpiywebIndex:
         is the measured operating point and clears the spread bar on every
         colour, so there is no trap to step around, and overlaying `explore`
         would move a measured width (2 per colour) for nothing.
-
-        `question` is the undivided question, read only when the config's
-        `question_color_width` is positive: it then seeds one more colour
-        beside the parts (see `retrieve_colored` in `spiyweb.retrieve`).
         """
         base = config if config is not None else ColoredRetrievalConfig()
         if profile is not None:
             base = self._profile(profile).as_colored(base)
         embedder = self._require_embedder()
         labels = list(parts)
-        texts = [parts[label] for label in labels]
-        with_question = question is not None and base.question_color_width > 0
-        vectors = embedder.embed_queries([*texts, question] if with_question else texts)
-        question_vector = vectors.pop() if with_question else None
+        vectors = embedder.embed_queries([parts[label] for label in labels])
         started = time.perf_counter()
         result = _retrieve_colored(
             dict(zip(labels, vectors, strict=True)),
@@ -452,7 +444,6 @@ class SpiywebIndex:
             negative=self._negative,
             conflict=self._conflict if self._negative else None,
             polarity=self._polarity,
-            question=question_vector,
         )
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         query = " | ".join(parts.values())
@@ -619,9 +610,6 @@ def _settings(
         "max_nodes": propagation.max_nodes,
         "split_alpha": propagation.split_alpha,
         "mass_enabled": propagation.mass.enabled,
-        # 0 on a plain call and on a coloured one with the mechanism off; a
-        # trace that hid it would make an extra colour look unexplained.
-        "question_color_width": getattr(config, "question_color_width", 0),
     }
 
 
