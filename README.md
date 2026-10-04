@@ -141,11 +141,14 @@ spiyweb lint my-index                 # what is wrong with the CORPUS
 `spiyweb index docs/ my-index --propositions` adds the second node layer:
 a local LLM (Ollama, `llama3.1:8b` by default) splits every passage into
 short, self-contained facts, and those join the graph beside the passages.
-It costs one LLM call per passage - about three seconds each on a laptop
-GPU - and it is the measured difference that matters: on MuSiQue the web
-over a passage-only graph beat plain `top-k` by **+.005** (inside the
-noise), and over the same corpus with propositions by **+.047**, CI
-[+.029, +.067]. An interrupted run resumes where it stopped; `--llm-model`,
+It costs one LLM call per passage, and whether it pays depends on the
+corpus. On MuSiQue it was the difference that mattered: the web over a
+passage-only graph beat plain `top-k` by **+.005** (inside the noise), and
+over the same corpus with propositions by **+.047**, CI [+.029, +.067]. On
+a real documentation corpus (below) it was not: the web beat `top-k`
+without propositions, and adding them changed nothing measurable while the
+build took 33 minutes instead of 2. Try the passage-only index first. An
+interrupted run resumes where it stopped; `--llm-model`,
 `--llm-url` and `--llm-key-env` point it at another model or any
 OpenAI-compatible API, the last one naming the environment variable that
 holds the key rather than the key.
@@ -309,7 +312,11 @@ RAPTOR). Spiyweb's claimed differentiators are elsewhere:
   energy, node count, hop depth), **corpus-gap warnings** (two dense clusters
   with no bridge), **contradiction records** with a ready-made, LLM-free
   question for the user, and **activation paths** as explanations the LLM can
-  cite. The retriever can say "I don't know, and here is why."
+  cite. The retriever can say "I don't know, and here is why." One honest
+  limit: the contradiction *mechanism* works on the edges it is given, but
+  the bundled *detector* that finds them is weak - it caught 31.6% of
+  WikiContradict's 253 annotated pairs, 9.5% end to end. Treat
+  contradiction records as a bonus, not a guarantee.
 - **Coloured multi-seed bridging.** A decomposed query injects differently
   coloured seeds; a node where two colours meet is a **bridge** — exactly
   where a multi-hop answer lives.
@@ -398,8 +405,82 @@ So the honest headline is a result with a condition attached: the advantage
 over both baselines is real on the deeper sets and does not transfer to a
 benchmark that is entirely 2-hop.
 
-Cost: ~2.3 LLM calls per question at query time, against roughly 4 for the
-iterative baseline.
+### Does better retrieval give better answers?
+
+One fixed reader (`llama3.1:8b`, temperature 0, the top 5 passages of each
+system, at most 12 words) answered all 4000 questions. Token F1, paired
+intervals:
+
+| dataset | top-k | iterative | SPIYWEB | vs top-k | vs iterative |
+|---|---|---|---|---|---|
+| MuSiQue (seed 42) | .186 | .270 | **.294** | **+.108** [+.082, +.133] | +.024 [−.001, +.048] |
+| MuSiQue (seed 123) | .200 | .292 | **.293** | **+.094** [+.070, +.118] | +.001 [−.024, +.026] |
+| 2WikiMultihopQA | .437 | .525 | **.561** | **+.123** [+.095, +.152] | **+.035** [+.008, +.062] |
+| HotpotQA | .620 | **.689** | .666 | **+.046** [+.021, +.069] | **−.023** [−.045, −.002] |
+
+The retrieval advantage reaches the answer: far ahead of `top-k` on every
+set, ahead of or level with the iterative baseline on the deeper sets, and
+behind it on HotpotQA - the same shape as the retrieval table.
+
+### Outside the benchmarks: the Python documentation
+
+The 15 file-and-archive pages of the official Python 3.11 library docs
+(`os.path`, `pathlib`, `shutil`, `zipfile`, `json`, `subprocess` ...), 3005
+blocks indexed exactly as `spiyweb index` reads them, and 30 questions
+written before the index existed - 15 answered by one page, 15 that need
+two (*"how do I convert rows of a CSV file into a JSON array?"*). Recall@5
+of the gold pages:
+
+| | top-k | SPIYWEB |
+|---|---|---|
+| all 30 | .867 | **.983** (+.117 [+.050, +.200]) |
+| one-page questions | 1.000 | 1.000 |
+| two-page questions | .733 | **.967** |
+
+Build: 2 minutes, 13 MB, ~85 ms per query on a laptop CPU. With
+`--propositions`: 33 minutes, 2655 LLM calls, 36 MB, and no measurable
+gain (web −.017, inside the noise). n = 30 is small - this is a case
+study, not a benchmark.
+
+### Latency with the LLM calls included
+
+The coloured web decomposes the question with an LLM and extracts
+intermediate answers; propagation itself is milliseconds, the calls are
+not. Fifty MuSiQue questions, every call real, laptop RTX 4070:
+
+| | p50 | p95 | LLM calls |
+|---|---|---|---|
+| top-k | 0.08 s | 0.09 s | 0 |
+| iterative | 3.8 s | 5.4 s | 4.0 |
+| SPIYWEB (coloured) | 9.1 s | 9.7 s | 2.2 |
+
+Fewer calls, yet slower - most likely because the decomposition model
+(`qwen3.5:9b`) and the extraction model (`llama3.1:8b`) do not fit on an
+8 GB card together, so the server reloads one for every query. That cause
+is not measured yet; one model for both roles is the test, and an open
+item.
+
+### HippoRAG 2, side by side
+
+HippoRAG 2's released question sets match our corpora passage for passage,
+so recall@5 is directly comparable (their numbers are published, ours are
+measured; their reader and ours differ, so answers are not compared):
+
+| | MuSiQue | 2Wiki | HotpotQA |
+|---|---|---|---|
+| HippoRAG 2 (published) | **74.7** | 90.4 | **96.3** |
+| SPIYWEB | 67.0 | **95.8** | 91.7 |
+
+### A stronger embedder does not help the web most
+
+Three newer embedders replaced `multilingual-e5-large` in a pre-registered
+screen. All three lifted dense recall@5 on MuSiQue (+.05 to +.12) and all
+three lost on HotpotQA (−.03 to −.08), so none passed. The strongest,
+`multilingual-e5-large-instruct`, was then run through the whole pipeline
+anyway: the web's recall rose (+.024 [+.008, +.040]), but the iterative
+baseline rose more, and overtook it (S@5 −.025 [−.041, −.011]). The
+default stays `multilingual-e5-large`; `EmbeddingConfig(model=...,
+query_prefix=..., passage_prefix=...)` takes another one.
 
 ## Documentation
 
