@@ -72,12 +72,26 @@ class Embedder(Protocol):
     def embed_passages(self, texts: Sequence[str]) -> list[list[float]]: ...
 
 
+def _require_sentence_transformers() -> type:
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as error:
+        raise ImportError(
+            "sentence-transformers is required for embedding; "
+            "install it with `pip install spiyweb[embed]`"
+        ) from error
+    return SentenceTransformer
+
+
 class SentenceTransformerEmbedder:
     """e5-style embedder over any `EncoderLike` (a real model or a test fake).
 
-    Without an injected model the sentence-transformers dependency loads
-    lazily on first construction, on the device resolved by `detect_device`
-    unless the config names one explicitly.
+    Without an injected model the sentence-transformers dependency is
+    checked at construction but the weights load on the first embed call, on
+    the device resolved by `detect_device` unless the config names one
+    explicitly. Construction must not take the GPU: `build_index` runs its
+    LLM stages (proposition extraction) before the embed stage, and on an
+    8 GB card the idle weights beside the LLM pushed VRAM to ~94%.
     """
 
     def __init__(
@@ -86,7 +100,10 @@ class SentenceTransformerEmbedder:
         model: EncoderLike | None = None,
     ) -> None:
         self._config = config if config is not None else EmbeddingConfig()
-        self._model = model if model is not None else self._load_model()
+        self._model: EncoderLike | None = model
+        if model is None:
+            # Fail before hours of LLM calls, not after them.
+            _require_sentence_transformers()
 
     @property
     def model_name(self) -> str:
@@ -108,13 +125,7 @@ class SentenceTransformerEmbedder:
         return f"{self._config.model} [query={query!r} passage={passage!r}]"
 
     def _load_model(self) -> EncoderLike:
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError as error:
-            raise ImportError(
-                "sentence-transformers is required for embedding; "
-                "install it with `pip install spiyweb[embed]`"
-            ) from error
+        SentenceTransformer = _require_sentence_transformers()
         device = self._config.device
         if device is None:
             device = detect_device()
@@ -131,6 +142,8 @@ class SentenceTransformerEmbedder:
         return self._encode([prefix + text for text in texts])
 
     def _encode(self, prefixed: list[str]) -> list[list[float]]:
+        if self._model is None:
+            self._model = self._load_model()
         rows = self._model.encode(
             prefixed,
             batch_size=self._config.batch_size,

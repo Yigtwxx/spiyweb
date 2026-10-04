@@ -151,3 +151,25 @@ def test_model_name_carries_non_default_prefixes() -> None:
         "recorded identity must tell them apart"
     )
     assert plain.model_name.startswith("m ")
+
+
+def test_weights_load_on_the_first_embed_not_at_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Construction must not take the GPU: build_index runs its LLM stage
+    # before the embed stage, and idle weights beside the LLM filled 8 GB.
+    pytest.importorskip("sentence_transformers")
+    loads: list[str] = []
+    encoder = FakeEncoder()
+
+    def fake_load(self: SentenceTransformerEmbedder) -> FakeEncoder:
+        loads.append(self.model_name)
+        return encoder
+
+    monkeypatch.setattr(SentenceTransformerEmbedder, "_load_model", fake_load)
+    embedder = SentenceTransformerEmbedder()
+    assert loads == []
+    embedder.embed_passages(["a"])
+    embedder.embed_queries(["b"])
+    assert loads == [embedder.model_name], "loaded exactly once, on first use"
+    assert len(encoder.calls) == 2

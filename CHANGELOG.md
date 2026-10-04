@@ -43,6 +43,11 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ### Fixed
 
+- `SentenceTransformerEmbedder` loads its weights on the first embed call
+  instead of at construction (the dependency check stays at construction).
+  `spiyweb index --propositions` built the embedder before its LLM stage, so
+  ~2.2 GB of idle weights sat beside the Ollama model for the whole
+  extraction and pushed an 8 GB card to ~94% VRAM.
 - Rerunning `spiyweb index <docs> <out>` on an existing index silently left
   out new and edited files: every stage skipped itself because its artifact
   existed. The command now syncs (`sync_index`) and rebuilds from scratch
@@ -50,14 +55,6 @@ regression suite, and its CLI flags are not covered by the policy above.
 
 ### Added
 
-- `ColoredRetrievalConfig.question_color_width` (default `0`, off) and a
-  `question=` argument on `retrieve_colored()` and
-  `SpiywebIndex.retrieve_colored()`: the undivided question can seed one more
-  colour beside its decomposed parts, under the same equal energy share, and
-  it never counts towards a bridge. It is shipped **off** because it was
-  measured and lost: on the sealed MuSiQue tuning set width 2 moved S@5 by
-  −.0072 CI [−.0136, −.0010] (HotpotQA +.0092, 2Wiki −.0022 n.s.), so no
-  retrieval number changes with this release.
 - `spiyweb.indexing.sync_index` and `IndexSync`: incremental indexing.
   Pass the whole current corpus; chunks whose text is unchanged keep their
   vectors, entities and propositions, and only new or changed chunks are

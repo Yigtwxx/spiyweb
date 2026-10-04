@@ -230,9 +230,9 @@ def _index(args: argparse.Namespace) -> int:
     print(f"{len(documents)} document(s), {units} unit(s) -> {args.out}")
 
     llm, llm_model = _proposition_llm(args) if args.propositions else (None, None)
-    # Seconds on a warm cache, minutes on the first download: said up front so
-    # the pause has a name (the monitor's progress reads this line too).
-    print("loading the embedding model ...", flush=True)
+    # The weights load at the embed stage (its "embedding N passages" line
+    # names the pause), not here: with --propositions the LLM runs first,
+    # and idle weights beside it filled an 8 GB card.
     embedder = SentenceTransformerEmbedder()
     try:
         pipeline = load_spacy_pipeline()
@@ -597,8 +597,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--propositions",
         action="store_true",
         help="add the proposition layer: one LLM call per unit (local Ollama "
-        "by default). Slower to build, and measured to be what lets the web "
-        "beat plain top-k",
+        "by default). Much slower to build; it helped on MuSiQue and did "
+        "nothing measurable on a documentation corpus - try without it first",
     )
     index.add_argument(
         "--llm-model", help=f"model for --propositions (default {_DEFAULT_LLM.model})"
