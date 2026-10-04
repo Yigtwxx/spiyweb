@@ -452,13 +452,20 @@ not. Fifty MuSiQue questions, every call real, laptop RTX 4070:
 |---|---|---|---|
 | top-k | 0.08 s | 0.09 s | 0 |
 | iterative | 3.8 s | 5.4 s | 4.0 |
-| SPIYWEB (coloured) | 9.1 s | 9.7 s | 2.2 |
+| SPIYWEB, default models | 9.1 s | 9.7 s | 2.2 |
+| SPIYWEB, one model for both roles | **1.3 s** | **1.9 s** | 3.2 |
 
-Fewer calls, yet slower - most likely because the decomposition model
-(`qwen3.5:9b`) and the extraction model (`llama3.1:8b`) do not fit on an
-8 GB card together, so the server reloads one for every query. That cause
-is not measured yet; one model for both roles is the test, and an open
-item.
+The default splits the work between two models - `qwen3.5:9b` decomposes,
+`llama3.1:8b` extracts intermediate answers - and on an 8 GB card they do
+not fit together, so the server reloads one on every query. Giving
+decomposition to `llama3.1:8b` as well removes the reload: the web drops to
+1.3 s, three times faster than the iterative baseline. **Its retrieval
+quality is not measured** - every quality number on this page uses the
+default pair, and the one-model run splits questions into more parts (3.2
+calls instead of 2.2). The library never calls an LLM itself - you
+decompose and pass the parts to `retrieve_colored()` - so the lesson for
+your own pipeline is: on an 8 GB card, use one model for every LLM step.
+In the harness that is `--decomp-model llama3.1:8b`.
 
 ### HippoRAG 2, side by side
 
