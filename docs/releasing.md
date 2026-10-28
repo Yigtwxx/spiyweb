@@ -1,13 +1,9 @@
 # Releasing
 
-The publishing decision is the owner's, and so is the token. Nothing in CI
-uploads anything; this file is the checklist that makes the upload boring when
-it happens.
-
-**Current stance (2026-08-25, unchanged):** the whole machine goes as far as
-**TestPyPI**. Real PyPI waits for outside demand, because the first upload
-under a name cannot be taken back and the name itself is still carrying two
-known risks — see `CLAUDE.local.md` §3.
+The publishing decision is the owner's: a release is a `v*` tag the owner
+pushes. `.github/workflows/release.yml` builds that tag and uploads it to PyPI
+through Trusted Publishing, so no token exists anywhere. This file is the
+checklist that makes the tag boring when it happens.
 
 ## The version has one source
 
@@ -78,13 +74,22 @@ was registered, and on an extras-free install every row should read
 
 ## Upload to PyPI
 
-`pip install spiyweb` only works once this has happened. It needs an account
-on <https://pypi.org> and an API token; the token is never committed and
-never pasted into a file in this repository.
+Bump `__version__`, commit, then tag that commit with the same number:
 
 ```bash
-uv publish --token pypi-...
+git tag v0.2.5 && git push origin v0.2.5
 ```
+
+The `release` workflow builds both artifacts, refuses a tag that does not
+match the built wheel's version, and publishes from the `pypi` environment -
+which is also what lists the upload under the repository's Deployments.
+
+Trusted Publishing has to be registered once on the PyPI side: project
+`spiyweb` → *Publishing* → *Add a new publisher* → GitHub, owner `Yigtwxx`,
+repository `spiyweb`, workflow `release.yml`, environment `pypi`.
+
+A manual run (*Actions* → *release* → *Run workflow*) rebuilds the current
+`main` and skips files PyPI already has, so it is safe to start by hand.
 
 **A version number burns on upload.** PyPI will not let `0.1.0` be replaced -
 only yanked - so the rehearsal below is worth the twenty minutes it costs.
@@ -119,11 +124,3 @@ resolve from PyPI while `spiyweb` itself comes from TestPyPI.
 A version number burns on upload. TestPyPI will refuse to accept `0.1.0`
 twice, so a second rehearsal needs `0.1.1` — that is the cost of the rehearsal
 and it is worth paying before the real index.
-
-## Real PyPI
-
-Deliberately not automated, and deliberately not written as a copy-pasteable
-command. When the decision is made, it is the same `uv publish` without the
-`--publish-url`, and the two things to settle first are in
-`CLAUDE.local.md` §3: the name, and whether the API is stable enough that the
-first public version number is one this project wants to live with.

@@ -1,0 +1,72 @@
+name: release
+
+# Publishes to PyPI through Trusted Publishing (OIDC): no API token is stored
+# in this repository or its secrets. The `pypi` environment is what makes the
+# upload show up under the repository's Deployments.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          # No cache: what this job builds goes to PyPI, so it starts from
+          # nothing rather than from a cache another run could have written.
+          enable-cache: false
+
+      - name: Build BOTH artifacts
+        # Bare `uv build`, for the reason docs/releasing.md gives: the wheel
+        # is built from the sdist, the path a release takes.
+        run: uv build
+
+      - name: The artifacts are fit to upload
+        run: uvx twine check dist/*
+
+      - name: The tag names the version that was built
+        # Checked on the artifact, not on `__init__.py`: a tag pushed without
+        # the version bump would otherwise upload nothing new and still pass.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          wheel="$(ls dist/*.whl)"
+          case "$wheel" in
+            "dist/spiyweb-${GITHUB_REF_NAME#v}-"*) ;;
+            *)
+              echo "::error::tag $GITHUB_REF_NAME does not match $wheel"
+              exit 1
+              ;;
+          esac
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/spiyweb
+    permissions:
+      id-token: write   # required for Trusted Publishing
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A manual run rebuilds a version that is usually on PyPI already;
+          # PyPI never replaces a file, so that run skips it instead of failing.
+          # A tag push never skips, so a version already up fails loudly.
+          skip-existing: ${{ github.event_name == 'workflow_dispatch' }}
