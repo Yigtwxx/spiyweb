@@ -80,9 +80,12 @@ Bump `__version__`, commit, then tag that commit with the same number:
 git tag v0.2.5 && git push origin v0.2.5
 ```
 
-The `release` workflow builds both artifacts, refuses a tag that does not
-match the built wheel's version, and publishes from the `pypi` environment -
-which is also what lists the upload under the repository's Deployments.
+The `release` workflow refuses a tag whose version has no `CHANGELOG.md`
+section or does not match the built wheel, publishes from the `pypi`
+environment - which is also what lists the upload under the repository's
+Deployments - and then creates the GitHub Release, with that CHANGELOG
+section as its notes (`scripts/release_notes.py`) and the wheel and sdist
+attached.
 
 Trusted Publishing has to be registered once on the PyPI side: project
 `spiyweb` → *Publishing* → *Add a new publisher* → GitHub, owner `Yigtwxx`,
