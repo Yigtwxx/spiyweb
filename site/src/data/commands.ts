@@ -65,6 +65,11 @@ export const siblings: readonly { name: string; href: string; tag: string }[] = 
         href: 'https://reasonhound.vercel.app',
         tag: 'a security scanner that follows the scent, not the checklist',
     },
+    {
+        name: 'sepia',
+        href: 'https://sepia-cli.vercel.app',
+        tag: 'describe a picture and watch it appear in coloured text',
+    },
 ];
 
 /* Using it as a library: three steps from a folder of documents to context for
